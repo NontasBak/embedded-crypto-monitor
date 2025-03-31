@@ -21,7 +21,6 @@ class OkxClient {
     static char rx_buffer[16384];
     static int rx_buffer_len;
 
-    static MeasurementCallback measurement_callback;
     void sendSubscription();
 
    public:
@@ -29,8 +28,6 @@ class OkxClient {
     ~OkxClient();
 
     bool connect();
-
-    void setCallback(MeasurementCallback callback);
 
     lws_context* getContext() const { return context; }
 

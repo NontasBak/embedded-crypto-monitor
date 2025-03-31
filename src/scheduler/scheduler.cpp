@@ -47,6 +47,9 @@ void Scheduler::run() {
         std::tm* now_tm = std::localtime(&now_time_t);
 
         int seconds_to_next_minute = 60 - now_tm->tm_sec;
+        std::cout << "Seconds to next minute: " << seconds_to_next_minute
+                  << std::endl;
+
         if (seconds_to_next_minute == 60) {
             seconds_to_next_minute = 0;
         }

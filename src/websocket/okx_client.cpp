@@ -4,7 +4,6 @@
 
 char OkxClient::rx_buffer[16384];
 int OkxClient::rx_buffer_len = 0;
-MeasurementCallback OkxClient::measurement_callback = nullptr;
 
 static OkxClient* current_client = nullptr;
 
@@ -64,10 +63,6 @@ bool OkxClient::connect() {
     return client_wsi != nullptr;
 }
 
-void OkxClient::setCallback(MeasurementCallback callback) {
-    measurement_callback = callback;
-}
-
 void OkxClient::sendSubscription() {
     // Create a JSON subscription message
     nlohmann::json subscription = nlohmann::json::object();
@@ -124,7 +119,7 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
                             std::stol(response["ts"].get<std::string>()));
 
                         measurement.displayMeasurement();
-                        // measurement_callback(measurement);
+                        measurement.writeMeasurementToFile();
                     }
                 } catch (const std::exception& e) {
                     std::cerr << "Error parsing JSON: " << e.what()

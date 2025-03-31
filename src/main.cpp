@@ -19,17 +19,9 @@ void signalHandler(int signal) {
     running = false;
 }
 
-// This function will be called when a new measurement is received
-void onMeasurement(const Measurement& measurement) {
-    // Add your code to process measurements here
-    // For example, you could store them in a database
-}
-
 // This function will be called every minute
 void runEveryMinute() {
     std::cout << "Running minute task at " << std::time(nullptr) << std::endl;
-    // Add your code to run every minute here
-    // For example, you could calculate statistics
 }
 
 int main() {
@@ -39,7 +31,6 @@ int main() {
 
     // Create the WebSocket client
     OkxClient client(SYMBOLS);
-    client.setCallback(onMeasurement);
 
     // Create the scheduler for periodic tasks
     Scheduler scheduler;
