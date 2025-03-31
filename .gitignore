@@ -33,3 +33,12 @@
 
 # Instruction files
 instructions-*
+
+# Old main file
+main-old.cpp
+
+# Data files
+data/*
+
+# Final binary file
+crypto_monitor
