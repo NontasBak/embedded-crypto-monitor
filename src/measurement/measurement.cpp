@@ -20,14 +20,13 @@ void Measurement::displayMeasurement() {
 };
 
 std::vector<measurement> Measurement::readMeasurementsFromFile(
-    const int windowMs) {
+    const int windowMs, long timestamp) {
     FILE* fp = fopen("data/measurement.txt", "r");
     if (fp == NULL) {
         std::cerr << "Error opening file" << std::endl;
         throw std::runtime_error("Failed to open measurement file");
     }
 
-    long currentTime = 0;
     std::vector<measurement> measurements;
     const int MAX_LINE = 1024;
     char buffer[MAX_LINE];
@@ -38,7 +37,6 @@ std::vector<measurement> Measurement::readMeasurementsFromFile(
 
     // Start from the end and move backwards
     long position = fileSize;
-    bool isFirstLine = true;
 
     // Read the file backwards line by line
     while (position > 0) {
@@ -61,15 +59,9 @@ std::vector<measurement> Measurement::readMeasurementsFromFile(
             sscanf(buffer, "%s %lf %lf %ld", instId, &m.px, &m.sz, &m.ts);
             m.instId = std::string(instId);
 
-            // Set current time from the first (most recent) line
-            if (isFirstLine) {
-                currentTime = m.ts;
-                isFirstLine = false;
-            }
-
             // Check if we're within the time window
-            if (currentTime - m.ts > windowMs) {
-                break; 
+            if (timestamp - m.ts > windowMs) {
+                break;
             }
 
             measurements.push_back(m);
@@ -87,17 +79,17 @@ std::vector<measurement> Measurement::readMeasurementsFromFile(
     fclose(fp);
 
     // Display all measurements
-    std::cout << "Measurements within the time window (" << windowMs
-              << "ms):" << std::endl;
-    std::cout << "---------------------------------------------------"
-              << std::endl;
-    for (const auto& meas : measurements) {
-        std::cout << meas.instId << " " << meas.px << " " << meas.sz << " "
-                  << meas.ts << std::endl;
-    }
-    std::cout << "---------------------------------------------------"
-              << std::endl;
-    std::cout << "Total measurements: " << measurements.size() << std::endl;
+    // std::cout << "Measurements within the time window (" << windowMs
+    //           << "ms):" << std::endl;
+    // std::cout << "---------------------------------------------------"
+    //           << std::endl;
+    // for (const auto& meas : measurements) {
+    //     std::cout << meas.instId << " " << meas.px << " " << meas.sz << " "
+    //               << meas.ts << std::endl;
+    // }
+    // std::cout << "---------------------------------------------------"
+    //           << std::endl;
+    // std::cout << "Total measurements: " << measurements.size() << std::endl;
 
     return measurements;
 }

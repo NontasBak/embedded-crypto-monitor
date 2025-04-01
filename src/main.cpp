@@ -16,6 +16,7 @@ static bool running = true;
 void signalHandler(int signal) {
     std::cout << "Received signal " << signal << ", shutting down..."
               << std::endl;
+    exit(0);
     running = false;
 }
 
@@ -28,7 +29,7 @@ int main() {
     OkxClient client(SYMBOLS);
 
     // Create the scheduler for periodic tasks
-    Scheduler scheduler;
+    Scheduler scheduler(SYMBOLS);
 
     // Connect to the WebSocket server
     if (!client.connect()) {

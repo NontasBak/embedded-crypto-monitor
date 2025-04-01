@@ -19,6 +19,7 @@ class Measurement {
     ~Measurement();
 
     void displayMeasurement();
-    static std::vector<measurement> readMeasurementsFromFile(const int window);
+    static std::vector<measurement> readMeasurementsFromFile(const int window,
+                                                             long timestamp);
     void writeMeasurementToFile();
 };

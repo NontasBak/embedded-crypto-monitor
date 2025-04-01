@@ -5,9 +5,9 @@
 #include <unistd.h>
 
 #include <chrono>
+#include <cmath>
 #include <iostream>
 
-#include "../measurement/measurement.hpp"
 #include "../moving_average/moving_average.hpp"
 #include "../pearson/pearson.hpp"
 
@@ -17,7 +17,9 @@ void* schedulerThreadFunction(void* args) {
     return nullptr;
 }
 
-Scheduler::Scheduler() : running(false) {}
+Scheduler::Scheduler(std::vector<std::string> SYMBOLS) : SYMBOLS(SYMBOLS) {
+    running = false;
+}
 
 Scheduler::~Scheduler() { stop(); }
 
@@ -44,19 +46,31 @@ void Scheduler::stop() {
 void Scheduler::run() {
     while (running) {
         auto now = std::chrono::system_clock::now();
-        auto now_time_t = std::chrono::system_clock::to_time_t(now);
-        std::tm* now_tm = std::localtime(&now_time_t);
+        auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             now.time_since_epoch())
+                             .count();
+        long nextMinuteTimestampInMs = ((timestamp / 60000) + 1) * 60000;
+        long msToWait = nextMinuteTimestampInMs - timestamp;
 
-        int seconds_to_next_minute = 60 - now_tm->tm_sec;
-        std::cout << "Seconds to next minute: " << seconds_to_next_minute
+        std::cout << "Sleeping for " << msToWait / 1000 << " seconds"
                   << std::endl;
 
-        if (seconds_to_next_minute == 60) {
-            seconds_to_next_minute = 0;
+        usleep(msToWait * 1000);
+
+        if (!running) {
+            return;
         }
 
-        usleep(seconds_to_next_minute * 1000 * 1000);
-        // pthread_create(&threadAverage, nullptr,
-        //                &MovingAverage::calculateAverage, nullptr);
+        calculateAverageArgs args = {SYMBOLS, nextMinuteTimestampInMs};
+
+        // Create moving average and Pearson calculation threads
+        pthread_create(&threadAverage, nullptr, MovingAverage::calculateAverage,
+                       (void*)&args);
+        // pthread_create(&threadPearson, nullptr, Pearson::calculatePearson,
+        //                nullptr);
+
+        // Wait for the threads to finish
+        pthread_join(threadAverage, nullptr);
+        // pthread_join(threadPearson, nullptr);
     }
 }

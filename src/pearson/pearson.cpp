@@ -5,4 +5,4 @@
 Pearson::Pearson() {};
 Pearson::~Pearson() {};
 
-void* Pearson::calculatePearson(void* arg) {}
+void* Pearson::calculatePearson(void* arg) { return nullptr; }

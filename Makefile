@@ -12,7 +12,9 @@ SOURCES = src/main.cpp \
           src/websocket/okx_client.cpp \
           src/scheduler/scheduler.cpp \
           src/utils/setup.cpp \
-          src/measurement/measurement.cpp
+          src/measurement/measurement.cpp \
+          src/moving_average/moving_average.cpp \
+          src/pearson/pearson.cpp
 
 # Name of executable
 TARGET = crypto_monitor
