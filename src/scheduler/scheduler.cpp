@@ -1,32 +1,33 @@
 #include "scheduler.hpp"
 
+#include <pthread.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <chrono>
 #include <iostream>
 
-Scheduler::Scheduler() : running(false) {}
+#include "../measurement/measurement.hpp"
+#include "../moving_average/moving_average.hpp"
+#include "../pearson/pearson.hpp"
 
-Scheduler::~Scheduler() { stop(); }
-
-void Scheduler::setMinuteTask(std::function<void()> task) {
-    minute_task = task;
-}
-
-void* Scheduler::threadFunction(void* arg) {
-    Scheduler* scheduler = static_cast<Scheduler*>(arg);
+void* schedulerThreadFunction(void* args) {
+    Scheduler* scheduler = (Scheduler*)args;
     scheduler->run();
     return nullptr;
 }
 
+Scheduler::Scheduler() : running(false) {}
+
+Scheduler::~Scheduler() { stop(); }
+
 void Scheduler::start() {
     if (!running) {
         running = true;
-        if (pthread_create(&thread, nullptr, &Scheduler::threadFunction,
-                           this) != 0) {
-            running = false;
-            std::cerr << "Failed to create pthread" << std::endl;
-        }
+
+        // Create the scheduler thread
+        pthread_create(&threadScheduler, nullptr, schedulerThreadFunction,
+                       this);
     }
 }
 
@@ -34,7 +35,7 @@ void Scheduler::stop() {
     if (running) {
         running = false;
         void* result;
-        if (pthread_join(thread, &result) != 0) {
+        if (pthread_join(threadScheduler, &result) != 0) {
             std::cerr << "Failed to join pthread" << std::endl;
         }
     }
@@ -54,13 +55,8 @@ void Scheduler::run() {
             seconds_to_next_minute = 0;
         }
 
-        for (int i = 0; i < seconds_to_next_minute && running; i++) {
-            sleep(1);
-        }
-
-        // Run the task if we're still running
-        if (running && minute_task) {
-            minute_task();
-        }
+        usleep(seconds_to_next_minute * 1000 * 1000);
+        // pthread_create(&threadAverage, nullptr,
+        //                &MovingAverage::calculateAverage, nullptr);
     }
 }

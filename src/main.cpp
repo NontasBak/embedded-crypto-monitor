@@ -19,11 +19,6 @@ void signalHandler(int signal) {
     running = false;
 }
 
-// This function will be called every minute
-void runEveryMinute() {
-    std::cout << "Running minute task at " << std::time(nullptr) << std::endl;
-}
-
 int main() {
     signal(SIGINT, signalHandler);
 
@@ -34,7 +29,6 @@ int main() {
 
     // Create the scheduler for periodic tasks
     Scheduler scheduler;
-    scheduler.setMinuteTask(runEveryMinute);
 
     // Connect to the WebSocket server
     if (!client.connect()) {
