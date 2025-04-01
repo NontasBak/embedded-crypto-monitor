@@ -42,3 +42,6 @@ data/*
 
 # Final binary file
 crypto_monitor
+
+# Producer-consumer
+producer_consumer.c
