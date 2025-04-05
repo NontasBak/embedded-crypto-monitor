@@ -27,9 +27,7 @@ scheduler_t* Scheduler::create(std::vector<std::string> SYMBOLS) {
     return scheduler;
 }
 
-void Scheduler::destroy(scheduler_t& scheduler) { 
-    stop(scheduler); 
-}
+void Scheduler::destroy(scheduler_t& scheduler) { stop(scheduler); }
 
 void Scheduler::start(scheduler_t& scheduler) {
     if (!scheduler.running) {
@@ -37,8 +35,8 @@ void Scheduler::start(scheduler_t& scheduler) {
         active_scheduler = &scheduler;
 
         // Create the scheduler thread
-        pthread_create(&scheduler.threadScheduler, nullptr, schedulerThreadFunction,
-                       &scheduler);
+        pthread_create(&scheduler.threadScheduler, nullptr,
+                       schedulerThreadFunction, &scheduler);
     }
 }
 
@@ -70,16 +68,19 @@ void Scheduler::run(scheduler_t& scheduler) {
             return;
         }
 
-        calculateAverageArgs args = {scheduler.SYMBOLS, nextMinuteTimestampInMs};
+        calculateAverageArgs argsAverage = {scheduler.SYMBOLS,
+                                            nextMinuteTimestampInMs};
+        calculatePearsonArgs argsPearson = {scheduler.SYMBOLS,
+                                            nextMinuteTimestampInMs};
 
         // Create moving average and Pearson calculation threads
-        pthread_create(&scheduler.threadAverage, nullptr, MovingAverage::calculateAverage,
-                       (void*)&args);
-        // pthread_create(&scheduler.threadPearson, nullptr, Pearson::calculatePearson,
-        //                nullptr);
+        pthread_create(&scheduler.threadAverage, nullptr,
+                       MovingAverage::calculateAverage, (void*)&argsAverage);
+        pthread_create(&scheduler.threadPearson, nullptr,
+                       Pearson::calculateAllPearson, (void*)&argsPearson);
 
         // Wait for the threads to finish
         pthread_join(scheduler.threadAverage, nullptr);
-        // pthread_join(scheduler.threadPearson, nullptr);
+        pthread_join(scheduler.threadPearson, nullptr);
     }
 }

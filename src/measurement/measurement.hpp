@@ -11,8 +11,11 @@ typedef struct {
 } measurement_t;
 
 namespace Measurement {
-    measurement_t create(const std::string instId, double px, double sz, long ts);
-    void displayMeasurement(const measurement_t& m);
-    std::vector<measurement_t> readMeasurementsFromFile(const int window, long timestamp);
-    void writeMeasurementToFile(const measurement_t& m);
-}
+
+measurement_t create(const std::string instId, double px, double sz, long ts);
+void displayMeasurement(const measurement_t& m);
+std::vector<measurement_t> readMeasurementsFromFile(const int window,
+                                                    long timestamp);
+void writeMeasurementToFile(const measurement_t& m);
+
+}  // namespace Measurement

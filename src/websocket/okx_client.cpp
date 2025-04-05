@@ -88,12 +88,13 @@ void OkxClient::sendSubscription(okx_client_t& client) {
     unsigned char* buf = (unsigned char*)malloc(LWS_PRE + message.length());
     memcpy(&buf[LWS_PRE], message.c_str(), message.length());
 
-    lws_write(client.client_wsi, &buf[LWS_PRE], message.length(), LWS_WRITE_TEXT);
+    lws_write(client.client_wsi, &buf[LWS_PRE], message.length(),
+              LWS_WRITE_TEXT);
     free(buf);
 }
 
 int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
-                        void* user, void* in, size_t len) {
+                          void* user, void* in, size_t len) {
     switch (reason) {
         case LWS_CALLBACK_CLIENT_ESTABLISHED:
             std::cout << "WebSocket connection established" << std::endl;
@@ -123,7 +124,7 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
                             std::stod(response["sz"].get<std::string>()),
                             std::stol(response["ts"].get<std::string>()));
 
-                        Measurement::displayMeasurement(measurement);
+                        // Measurement::displayMeasurement(measurement);
                         Measurement::writeMeasurementToFile(measurement);
                     }
                 } catch (const std::exception& e) {
@@ -149,10 +150,10 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
     return 0;
 }
 
-bool OkxClient::isConnected(const okx_client_t& client) { 
-    return client.client_wsi != nullptr; 
+bool OkxClient::isConnected(const okx_client_t& client) {
+    return client.client_wsi != nullptr;
 }
 
-lws_context* OkxClient::getContext(const okx_client_t& client) { 
-    return client.context; 
+lws_context* OkxClient::getContext(const okx_client_t& client) {
+    return client.context;
 }

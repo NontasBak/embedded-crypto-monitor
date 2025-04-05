@@ -32,7 +32,8 @@ void* MovingAverage::calculateAverage(void* arg) {
             totalVolume += meas.sz;
         }
 
-        double average = (totalVolume > 0) ? weightedAveragePrice / totalVolume : 0;
+        double average =
+            (totalVolume > 0) ? weightedAveragePrice / totalVolume : 0;
 
         // Measure delay
         auto now = std::chrono::system_clock::now();
@@ -50,6 +51,75 @@ void* MovingAverage::calculateAverage(void* arg) {
     }
 
     return nullptr;
+}
+
+std::vector<average_t> MovingAverage::readAveragesFromFile(long timestamp) {
+    FILE* fp = fopen("data/average.txt", "r");
+    if (fp == NULL) {
+        std::cerr << "Error opening file" << std::endl;
+        throw std::runtime_error("Failed to open average file");
+    }
+
+    std::vector<average_t> averages;
+    const int MAX_LINE = 1024;
+    char buffer[MAX_LINE];
+
+    // Move to the end of the file
+    fseek(fp, 0, SEEK_END);
+    long fileSize = ftell(fp);
+
+    // Start from the end and move backwards
+    long position = fileSize;
+
+    // Read the file backwards line by line
+    while (position > 0) {
+        // Move back until we find a newline or reach the beginning
+        long i;
+        for (i = position - 1; i >= 0; i--) {
+            fseek(fp, i, SEEK_SET);
+            char c = fgetc(fp);
+            if (c == '\n' || i == 0) {
+                break;
+            }
+        }
+
+        // Read the line
+        fseek(fp, i == 0 ? 0 : i + 1, SEEK_SET);
+        if (fgets(buffer, MAX_LINE, fp) != NULL) {
+            // Parse the line
+            average_t a;
+            char symbol[32];  // Adjust size as needed
+            sscanf(buffer, "%s %lf %ld", symbol, &a.average, &a.timestamp);
+            a.symbol = std::string(symbol);
+
+            averages.push_back(a);
+        }
+
+        // Move position to before the line we just read
+        position = i;
+
+        // Break if we've reached the start of the file
+        if (i == 0) {
+            break;
+        }
+    }
+
+    fclose(fp);
+
+    // Display all measurements
+    // std::cout << "Measurements within the time window (" << windowMs
+    //           << "ms):" << std::endl;
+    // std::cout << "---------------------------------------------------"
+    //           << std::endl;
+    // for (const auto& meas : measurements) {
+    //     std::cout << meas.instId << " " << meas.px << " " << meas.sz << " "
+    //               << meas.ts << std::endl;
+    // }
+    // std::cout << "---------------------------------------------------"
+    //           << std::endl;
+    // std::cout << "Total measurements: " << measurements.size() << std::endl;
+
+    return averages;
 }
 
 void MovingAverage::writeAverageToFile(std::string symbol, double average,

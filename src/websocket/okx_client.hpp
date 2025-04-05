@@ -15,16 +15,18 @@ typedef struct {
 } okx_client_t;
 
 namespace OkxClient {
-    // Buffer for receiving data
-    extern char rx_buffer[16384];
-    extern int rx_buffer_len;
 
-    okx_client_t create(const std::vector<std::string>& symbols);
-    void destroy(okx_client_t& client);
-    bool connect(okx_client_t& client);
-    void sendSubscription(okx_client_t& client);
-    bool isConnected(const okx_client_t& client);
-    lws_context* getContext(const okx_client_t& client);
-    int wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
-                   void* user, void* in, size_t len);
-}
+// Buffer for receiving data
+extern char rx_buffer[16384];
+extern int rx_buffer_len;
+
+okx_client_t create(const std::vector<std::string>& symbols);
+void destroy(okx_client_t& client);
+bool connect(okx_client_t& client);
+void sendSubscription(okx_client_t& client);
+bool isConnected(const okx_client_t& client);
+lws_context* getContext(const okx_client_t& client);
+int wsCallback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
+               void* in, size_t len);
+
+}  // namespace OkxClient

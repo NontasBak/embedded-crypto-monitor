@@ -15,9 +15,11 @@ typedef struct {
 } scheduler_t;
 
 namespace Scheduler {
-    scheduler_t* create(std::vector<std::string> SYMBOLS);
-    void destroy(scheduler_t& scheduler);
-    void start(scheduler_t& scheduler);
-    void run(scheduler_t& scheduler);
-    void stop(scheduler_t& scheduler);
-}
+
+scheduler_t* create(std::vector<std::string> SYMBOLS);
+void destroy(scheduler_t& scheduler);
+void start(scheduler_t& scheduler);
+void run(scheduler_t& scheduler);
+void stop(scheduler_t& scheduler);
+
+}  // namespace Scheduler

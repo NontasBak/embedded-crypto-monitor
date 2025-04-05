@@ -1,9 +1,14 @@
 #include "pearson.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <iostream>
 
-void Pearson::writePearsonToFile(double average) {
+#include "../moving_average/moving_average.hpp"
+
+void Pearson::writePearsonToFile(std::string symbol1, std::string symbol2,
+                                 double pearson, long timestamp,
+                                 long maxTimestamp, int delay) {
     std::string filename = "data/pearson.txt";
 
     // open the file for writing
@@ -14,11 +19,165 @@ void Pearson::writePearsonToFile(double average) {
     }
 
     // write to the text file
-    fprintf(fp, "%.6f\n", average);
+    fprintf(fp, "%s %s %.6f %ld %ld %d\n", symbol1.c_str(), symbol2.c_str(),
+            pearson, maxTimestamp, timestamp, delay);
     fclose(fp);
 }
 
-void* Pearson::calculatePearson(void* arg) { 
-    // Implementation will go here in future
-    return nullptr; 
+double Pearson::calculatePearson(const std::vector<double>& x,
+                                 const std::vector<double>& y) {
+    if (x.size() != y.size()) {
+        std::cerr << "Arrays must have the same length" << std::endl;
+        return 0;
+    }
+
+    const size_t n = x.size();
+    if (n == 0) {
+        return 0;
+    }
+
+    // Calculate means
+    double xMean = 0, yMean = 0;
+    for (size_t i = 0; i < n; i++) {
+        xMean += x[i];
+        yMean += y[i];
+    }
+    xMean /= n;
+    yMean /= n;
+
+    // Calculate correlation components
+    double numerator = 0;
+    double xDenominator = 0;
+    double yDenominator = 0;
+
+    for (size_t i = 0; i < n; i++) {
+        double xDiff = x[i] - xMean;
+        double yDiff = y[i] - yMean;
+        numerator += xDiff * yDiff;
+        xDenominator += xDiff * xDiff;
+        yDenominator += yDiff * yDiff;
+    }
+
+    if (xDenominator == 0 || yDenominator == 0) {
+        return 0;
+    }
+
+    double correlation = numerator / sqrt(xDenominator * yDenominator);
+    return correlation;
+}
+
+size_t findMaximumIndex(const std::vector<double>& arr) {
+    if (arr.empty()) return 0;
+
+    double max = arr[0];
+    size_t maxIndex = 0;
+
+    for (size_t i = 1; i < arr.size(); i++) {
+        if (arr[i] > max) {
+            maxIndex = i;
+            max = arr[i];
+        }
+    }
+
+    return maxIndex;
+}
+
+std::vector<double> getAveragesFromSymbol(
+    const std::string& symbol, const std::vector<average_t>& averages,
+    int window = 0) {
+    std::vector<double> averagesSlice;
+    int windowCounter = 1;
+
+    for (const auto& average : averages) {
+        if (average.symbol == symbol) {
+            if (window != 0 && windowCounter > window) {
+                break;
+            }
+            averagesSlice.push_back(average.average);
+            windowCounter++;
+        }
+    }
+    return averagesSlice;
+}
+
+// void addPearsonCorrelation(const std::string& symbol1, const std::string&
+// symbol2,
+//                           double pearsonValue, long currentTimestamp, long
+//                           slidingTimestamp) {
+//     std::string pearsonStr = symbol1 + "-" + symbol2 + " " +
+//                            std::to_string(pearsonValue) + " " +
+//                            std::to_string(currentTimestamp) + " " +
+//                            std::to_string(slidingTimestamp);
+//     std::cout << "Pearson correlation: " << pearsonStr << std::endl;
+//     Pearson::writePearsonToFile(pearsonValue);
+// }
+
+void* Pearson::calculateAllPearson(void* arg) {
+    calculatePearsonArgs* args = (calculatePearsonArgs*)arg;
+    const long currentTimestamp = args->timestampInMs;
+    const std::vector<std::string>& SYMBOLS = args->SYMBOLS;
+    const int PEARSON_WINDOW = 5;
+
+    const std::vector<average_t> averages =
+        MovingAverage::readAveragesFromFile(currentTimestamp);
+
+    for (const auto& symbol1 : SYMBOLS) {
+        std::vector<double> averages1 =
+            getAveragesFromSymbol(symbol1, averages, PEARSON_WINDOW);
+
+        if (averages1.size() < PEARSON_WINDOW) {
+            return nullptr;
+        }
+
+        std::vector<double> pearsonValues;
+        std::vector<long> slidingTimestamps;
+        std::vector<std::string> symbol2arr;
+
+        for (const auto& symbol2 : SYMBOLS) {
+            std::vector<double> averages2 =
+                getAveragesFromSymbol(symbol2, averages);
+
+            const size_t n = averages2.size();
+
+            int numOfSlides;
+            if (symbol1 != symbol2) {
+                numOfSlides = n - PEARSON_WINDOW + 1;
+            } else {
+                numOfSlides = n - PEARSON_WINDOW - 1;
+            }
+
+            // std::cout << "numOfSlides: " << numOfSlides << std::endl;
+
+            if (numOfSlides <= 0) continue;
+
+            for (int i = 0; i < numOfSlides; i++) {
+                std::vector<double> averagesSlice2(
+                    averages2.begin() + i,
+                    averages2.begin() + i + PEARSON_WINDOW);
+
+                double pearsonValue =
+                    calculatePearson(averages1, averagesSlice2);
+
+                // std::cout << "Pearson correlation for " << symbol1 << " and "
+                //           << symbol2 << ": " << pearsonValue << std::endl;
+                pearsonValues.push_back(pearsonValue);
+
+                // Starting timestamp of window
+                const long slideTimestamp =
+                    currentTimestamp - averages2.size() * 60000 + i * 60000;
+
+                slidingTimestamps.push_back(slideTimestamp);
+                symbol2arr.push_back(symbol2);
+            }
+        }
+
+        if (!pearsonValues.empty()) {
+            size_t maximumIndex = findMaximumIndex(pearsonValues);
+            writePearsonToFile(symbol1, symbol2arr[maximumIndex],
+                               pearsonValues[maximumIndex], currentTimestamp,
+                               slidingTimestamps[maximumIndex], 0);
+        }
+    }
+
+    return nullptr;
 }

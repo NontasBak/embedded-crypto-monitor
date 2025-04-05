@@ -4,8 +4,8 @@
 #include <cstdio>
 #include <iostream>
 
-measurement_t Measurement::create(const std::string instId, double px, double sz,
-                       long ts) {
+measurement_t Measurement::create(const std::string instId, double px,
+                                  double sz, long ts) {
     measurement_t m;
     m.instId = instId;
     m.px = px;
@@ -15,8 +15,8 @@ measurement_t Measurement::create(const std::string instId, double px, double sz
 };
 
 void Measurement::displayMeasurement(const measurement_t& m) {
-    std::cout << m.instId << " " << m.px << " " << m.sz << " "
-              << m.ts << std::endl;
+    std::cout << m.instId << " " << m.px << " " << m.sz << " " << m.ts
+              << std::endl;
 };
 
 std::vector<measurement_t> Measurement::readMeasurementsFromFile(
