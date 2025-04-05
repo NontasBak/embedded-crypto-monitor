@@ -1,8 +1,24 @@
 #include "pearson.hpp"
 
-// int MovingAverage::window = 15 * 60 * 1000;  // In milliseconds
+#include <cstdio>
+#include <iostream>
 
-Pearson::Pearson() {};
-Pearson::~Pearson() {};
+void Pearson::writePearsonToFile(double average) {
+    std::string filename = "data/pearson.txt";
 
-void* Pearson::calculatePearson(void* arg) { return nullptr; }
+    // open the file for writing
+    FILE* fp = fopen(filename.c_str(), "a");
+    if (fp == NULL) {
+        std::cout << "Error opening the file " << filename << std::endl;
+        return;
+    }
+
+    // write to the text file
+    fprintf(fp, "%.6f\n", average);
+    fclose(fp);
+}
+
+void* Pearson::calculatePearson(void* arg) { 
+    // Implementation will go here in future
+    return nullptr; 
+}

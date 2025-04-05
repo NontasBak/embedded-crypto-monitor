@@ -9,19 +9,16 @@
 
 int MovingAverage::window = 15 * 60 * 1000;  // In milliseconds
 
-MovingAverage::MovingAverage() {};
-MovingAverage::~MovingAverage() {};
-
 void* MovingAverage::calculateAverage(void* arg) {
     calculateAverageArgs* args = (calculateAverageArgs*)arg;
 
-    std::vector<measurement> measurements =
+    std::vector<measurement_t> measurements =
         Measurement::readMeasurementsFromFile(window, args->timestampInMs);
 
     for (const std::string& symbol : args->SYMBOLS) {
-        std::vector<measurement> measurementsForSymbol;
+        std::vector<measurement_t> measurementsForSymbol;
 
-        for (const measurement& meas : measurements) {
+        for (const measurement_t& meas : measurements) {
             if (meas.instId == symbol) {
                 measurementsForSymbol.push_back(meas);
             }
@@ -30,12 +27,12 @@ void* MovingAverage::calculateAverage(void* arg) {
         double weightedAveragePrice = 0;
         double totalVolume = 0;
 
-        for (const measurement& meas : measurementsForSymbol) {
+        for (const measurement_t& meas : measurementsForSymbol) {
             weightedAveragePrice += meas.px * meas.sz;
             totalVolume += meas.sz;
         }
 
-        double average = weightedAveragePrice / totalVolume;
+        double average = (totalVolume > 0) ? weightedAveragePrice / totalVolume : 0;
 
         // Measure delay
         auto now = std::chrono::system_clock::now();

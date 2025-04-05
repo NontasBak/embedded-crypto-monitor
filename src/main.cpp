@@ -11,13 +11,14 @@ const std::vector<std::string> SYMBOLS = {"BTC-USDT",  "ADA-USDT", "ETH-USDT",
                                           "LTC-USDT",  "BNB-USDT"};
 
 static bool running = true;
+static okx_client_t* client_ptr = nullptr;
 
 // Handle Ctrl+C signal
 void signalHandler(int signal) {
     std::cout << "Received signal " << signal << ", shutting down..."
               << std::endl;
-    exit(0);
     running = false;
+    exit(0);
 }
 
 int main() {
@@ -26,27 +27,29 @@ int main() {
     Setup::initializeFiles();
 
     // Create the WebSocket client
-    OkxClient client(SYMBOLS);
+    okx_client_t client = OkxClient::create(SYMBOLS);
+    client_ptr = &client;
 
     // Create the scheduler for periodic tasks
-    Scheduler scheduler(SYMBOLS);
+    scheduler_t* scheduler = Scheduler::create(SYMBOLS);
 
     // Connect to the WebSocket server
-    if (!client.connect()) {
+    if (!OkxClient::connect(client)) {
         std::cerr << "Failed to connect to WebSocket" << std::endl;
         return 1;
     }
 
-    scheduler.start();
+    Scheduler::start(*scheduler);
     std::cout << "Crypto monitor is running. Press Ctrl+C to exit."
               << std::endl;
 
     // Main event loop
-    while (running && client.isConnected()) {
-        lws_service(client.getContext(), 100);
+    while (running && OkxClient::isConnected(client)) {
+        lws_service(OkxClient::getContext(client), 100);
     }
 
-    scheduler.stop();
+    Scheduler::stop(*scheduler);
+    OkxClient::destroy(client);
 
     std::cout << "Crypto monitor has shut down." << std::endl;
     return 0;

@@ -4,22 +4,22 @@
 #include <cstdio>
 #include <iostream>
 
-Measurement::Measurement(const std::string instId, double px, double sz,
-                         long ts) {
+measurement_t Measurement::create(const std::string instId, double px, double sz,
+                       long ts) {
+    measurement_t m;
     m.instId = instId;
     m.px = px;
     m.sz = sz;
     m.ts = ts;
+    return m;
 };
 
-Measurement::~Measurement() {};
-
-void Measurement::displayMeasurement() {
-    std::cout << this->m.instId << " " << this->m.px << " " << this->m.sz << " "
-              << this->m.ts << std::endl;
+void Measurement::displayMeasurement(const measurement_t& m) {
+    std::cout << m.instId << " " << m.px << " " << m.sz << " "
+              << m.ts << std::endl;
 };
 
-std::vector<measurement> Measurement::readMeasurementsFromFile(
+std::vector<measurement_t> Measurement::readMeasurementsFromFile(
     const int windowMs, long timestamp) {
     FILE* fp = fopen("data/measurement.txt", "r");
     if (fp == NULL) {
@@ -27,7 +27,7 @@ std::vector<measurement> Measurement::readMeasurementsFromFile(
         throw std::runtime_error("Failed to open measurement file");
     }
 
-    std::vector<measurement> measurements;
+    std::vector<measurement_t> measurements;
     const int MAX_LINE = 1024;
     char buffer[MAX_LINE];
 
@@ -54,7 +54,7 @@ std::vector<measurement> Measurement::readMeasurementsFromFile(
         fseek(fp, i == 0 ? 0 : i + 1, SEEK_SET);
         if (fgets(buffer, MAX_LINE, fp) != NULL) {
             // Parse the line
-            measurement m;
+            measurement_t m;
             char instId[32];  // Adjust size as needed
             sscanf(buffer, "%s %lf %lf %ld", instId, &m.px, &m.sz, &m.ts);
             m.instId = std::string(instId);
@@ -94,7 +94,7 @@ std::vector<measurement> Measurement::readMeasurementsFromFile(
     return measurements;
 }
 
-void Measurement::writeMeasurementToFile() {
+void Measurement::writeMeasurementToFile(const measurement_t& m) {
     std::string filename = "data/measurement.txt";
 
     // open the file for writing

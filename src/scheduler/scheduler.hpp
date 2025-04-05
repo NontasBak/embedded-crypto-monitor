@@ -6,18 +6,18 @@
 #include <string>
 #include <vector>
 
-// A simple scheduler that runs a task every minute
-class Scheduler {
-   private:
-    pthread_t threadScheduler, threadAverage, threadPearson;
+typedef struct {
+    pthread_t threadScheduler;
+    pthread_t threadAverage;
+    pthread_t threadPearson;
     std::atomic<bool> running;
     std::vector<std::string> SYMBOLS;
+} scheduler_t;
 
-   public:
-    Scheduler(std::vector<std::string> SYMBOLS);
-    ~Scheduler();
-
-    void start();
-    void run();
-    void stop();
-};
+namespace Scheduler {
+    scheduler_t* create(std::vector<std::string> SYMBOLS);
+    void destroy(scheduler_t& scheduler);
+    void start(scheduler_t& scheduler);
+    void run(scheduler_t& scheduler);
+    void stop(scheduler_t& scheduler);
+}

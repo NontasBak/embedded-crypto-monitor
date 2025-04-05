@@ -11,40 +11,49 @@
 #include "../moving_average/moving_average.hpp"
 #include "../pearson/pearson.hpp"
 
+// Store a reference to the active scheduler
+static scheduler_t* active_scheduler = nullptr;
+
 void* schedulerThreadFunction(void* args) {
-    Scheduler* scheduler = (Scheduler*)args;
-    scheduler->run();
+    scheduler_t* scheduler = (scheduler_t*)args;
+    Scheduler::run(*scheduler);
     return nullptr;
 }
 
-Scheduler::Scheduler(std::vector<std::string> SYMBOLS) : SYMBOLS(SYMBOLS) {
-    running = false;
+scheduler_t* Scheduler::create(std::vector<std::string> SYMBOLS) {
+    scheduler_t* scheduler = new scheduler_t();
+    scheduler->SYMBOLS = SYMBOLS;
+    scheduler->running = false;
+    return scheduler;
 }
 
-Scheduler::~Scheduler() { stop(); }
+void Scheduler::destroy(scheduler_t& scheduler) { 
+    stop(scheduler); 
+}
 
-void Scheduler::start() {
-    if (!running) {
-        running = true;
+void Scheduler::start(scheduler_t& scheduler) {
+    if (!scheduler.running) {
+        scheduler.running = true;
+        active_scheduler = &scheduler;
 
         // Create the scheduler thread
-        pthread_create(&threadScheduler, nullptr, schedulerThreadFunction,
-                       this);
+        pthread_create(&scheduler.threadScheduler, nullptr, schedulerThreadFunction,
+                       &scheduler);
     }
 }
 
-void Scheduler::stop() {
-    if (running) {
-        running = false;
+void Scheduler::stop(scheduler_t& scheduler) {
+    if (scheduler.running) {
+        scheduler.running = false;
         void* result;
-        if (pthread_join(threadScheduler, &result) != 0) {
+        if (pthread_join(scheduler.threadScheduler, &result) != 0) {
             std::cerr << "Failed to join pthread" << std::endl;
         }
     }
 }
 
-void Scheduler::run() {
-    while (running) {
+void Scheduler::run(scheduler_t& scheduler) {
+    while (scheduler.running) {
         auto now = std::chrono::system_clock::now();
         auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
                              now.time_since_epoch())
@@ -57,20 +66,20 @@ void Scheduler::run() {
 
         usleep(msToWait * 1000);
 
-        if (!running) {
+        if (!scheduler.running) {
             return;
         }
 
-        calculateAverageArgs args = {SYMBOLS, nextMinuteTimestampInMs};
+        calculateAverageArgs args = {scheduler.SYMBOLS, nextMinuteTimestampInMs};
 
         // Create moving average and Pearson calculation threads
-        pthread_create(&threadAverage, nullptr, MovingAverage::calculateAverage,
+        pthread_create(&scheduler.threadAverage, nullptr, MovingAverage::calculateAverage,
                        (void*)&args);
-        // pthread_create(&threadPearson, nullptr, Pearson::calculatePearson,
+        // pthread_create(&scheduler.threadPearson, nullptr, Pearson::calculatePearson,
         //                nullptr);
 
         // Wait for the threads to finish
-        pthread_join(threadAverage, nullptr);
-        // pthread_join(threadPearson, nullptr);
+        pthread_join(scheduler.threadAverage, nullptr);
+        // pthread_join(scheduler.threadPearson, nullptr);
     }
 }

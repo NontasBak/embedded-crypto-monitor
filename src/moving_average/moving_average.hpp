@@ -1,7 +1,6 @@
 #pragma once
 
 #include <pthread.h>
-
 #include <string>
 #include <vector>
 
@@ -10,17 +9,10 @@ struct calculateAverageArgs {
     long timestampInMs;
 };
 
-class MovingAverage {
-   private:
-    static int window;
-    // static int average;
-    // pthread_t thread;
-    // double average;
-   public:
-    MovingAverage();
-    ~MovingAverage();
+namespace MovingAverage {
+    extern int window;  // In milliseconds
 
-    static void writeAverageToFile(std::string symbol, double average,
-                                   long timestamp, int delay);
-    static void* calculateAverage(void* arg);
-};
+    void writeAverageToFile(std::string symbol, double average,
+                            long timestamp, int delay);
+    void* calculateAverage(void* arg);
+}

@@ -5,7 +5,7 @@
 char OkxClient::rx_buffer[16384];
 int OkxClient::rx_buffer_len = 0;
 
-static OkxClient* current_client = nullptr;
+static okx_client_t* current_client = nullptr;
 
 static const struct lws_protocols protocols[] = {
     {
@@ -17,20 +17,24 @@ static const struct lws_protocols protocols[] = {
     {NULL, NULL, 0, 0}  // terminator
 };
 
-OkxClient::OkxClient(const std::vector<std::string>& symbols)
-    : symbols(symbols), context(nullptr), client_wsi(nullptr) {
-    current_client = this;
+okx_client_t OkxClient::create(const std::vector<std::string>& symbols) {
+    okx_client_t client;
+    client.symbols = symbols;
+    client.context = nullptr;
+    client.client_wsi = nullptr;
+    current_client = &client;
+    return client;
 }
 
-OkxClient::~OkxClient() {
-    if (context) {
-        lws_context_destroy(context);
-        context = nullptr;
-        client_wsi = nullptr;
+void OkxClient::destroy(okx_client_t& client) {
+    if (client.context) {
+        lws_context_destroy(client.context);
+        client.context = nullptr;
+        client.client_wsi = nullptr;
     }
 }
 
-bool OkxClient::connect() {
+bool OkxClient::connect(okx_client_t& client) {
     struct lws_context_creation_info info;
     memset(&info, 0, sizeof info);
 
@@ -40,8 +44,8 @@ bool OkxClient::connect() {
     info.uid = -1;
     info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
 
-    context = lws_create_context(&info);
-    if (!context) {
+    client.context = lws_create_context(&info);
+    if (!client.context) {
         std::cerr << "lws init failed" << std::endl;
         return false;
     }
@@ -49,7 +53,7 @@ bool OkxClient::connect() {
     struct lws_client_connect_info ccinfo;
     memset(&ccinfo, 0, sizeof ccinfo);
 
-    ccinfo.context = context;
+    ccinfo.context = client.context;
     ccinfo.address = "ws.okx.com";
     ccinfo.port = 8443;
     ccinfo.path = "/ws/v5/public";
@@ -59,17 +63,18 @@ bool OkxClient::connect() {
     ccinfo.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED;
 
     std::cout << "Connecting to OKX WebSocket..." << std::endl;
-    client_wsi = lws_client_connect_via_info(&ccinfo);
-    return client_wsi != nullptr;
+    client.client_wsi = lws_client_connect_via_info(&ccinfo);
+    current_client = &client;
+    return client.client_wsi != nullptr;
 }
 
-void OkxClient::sendSubscription() {
+void OkxClient::sendSubscription(okx_client_t& client) {
     // Create a JSON subscription message
     nlohmann::json subscription = nlohmann::json::object();
     nlohmann::json args = nlohmann::json::array();
 
     // Add each symbol to the subscription
-    for (const std::string& symbol : symbols) {
+    for (const std::string& symbol : client.symbols) {
         nlohmann::json arg = {{"channel", "trades"}, {"instId", symbol}};
         args.push_back(arg);
     }
@@ -83,17 +88,17 @@ void OkxClient::sendSubscription() {
     unsigned char* buf = (unsigned char*)malloc(LWS_PRE + message.length());
     memcpy(&buf[LWS_PRE], message.c_str(), message.length());
 
-    lws_write(client_wsi, &buf[LWS_PRE], message.length(), LWS_WRITE_TEXT);
+    lws_write(client.client_wsi, &buf[LWS_PRE], message.length(), LWS_WRITE_TEXT);
     free(buf);
 }
 
 int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
-                          void* user, void* in, size_t len) {
+                        void* user, void* in, size_t len) {
     switch (reason) {
         case LWS_CALLBACK_CLIENT_ESTABLISHED:
             std::cout << "WebSocket connection established" << std::endl;
             if (current_client) {
-                current_client->sendSubscription();
+                sendSubscription(*current_client);
             }
             break;
 
@@ -112,14 +117,14 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
                     if (response.contains("data")) {
                         response = response["data"][0];
 
-                        Measurement measurement(
+                        measurement_t measurement = Measurement::create(
                             response["instId"],
                             std::stod(response["px"].get<std::string>()),
                             std::stod(response["sz"].get<std::string>()),
                             std::stol(response["ts"].get<std::string>()));
 
-                        measurement.displayMeasurement();
-                        measurement.writeMeasurementToFile();
+                        Measurement::displayMeasurement(measurement);
+                        Measurement::writeMeasurementToFile(measurement);
                     }
                 } catch (const std::exception& e) {
                     std::cerr << "Error parsing JSON: " << e.what()
@@ -142,4 +147,12 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
     }
 
     return 0;
+}
+
+bool OkxClient::isConnected(const okx_client_t& client) { 
+    return client.client_wsi != nullptr; 
+}
+
+lws_context* OkxClient::getContext(const okx_client_t& client) { 
+    return client.context; 
 }

@@ -8,31 +8,23 @@
 
 #include "../measurement/measurement.hpp"
 
-// Forward declaration of callback function
-typedef void (*MeasurementCallback)(const Measurement& measurement);
-
-class OkxClient {
-   private:
+typedef struct {
     std::vector<std::string> symbols;
     struct lws_context* context;
     struct lws* client_wsi;
+} okx_client_t;
 
+namespace OkxClient {
     // Buffer for receiving data
-    static char rx_buffer[16384];
-    static int rx_buffer_len;
+    extern char rx_buffer[16384];
+    extern int rx_buffer_len;
 
-    void sendSubscription();
-
-   public:
-    OkxClient(const std::vector<std::string>& symbols);
-    ~OkxClient();
-
-    bool connect();
-
-    lws_context* getContext() const { return context; }
-
-    bool isConnected() const { return client_wsi != nullptr; }
-
-    static int wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
-                          void* user, void* in, size_t len);
-};
+    okx_client_t create(const std::vector<std::string>& symbols);
+    void destroy(okx_client_t& client);
+    bool connect(okx_client_t& client);
+    void sendSubscription(okx_client_t& client);
+    bool isConnected(const okx_client_t& client);
+    lws_context* getContext(const okx_client_t& client);
+    int wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
+                   void* user, void* in, size_t len);
+}

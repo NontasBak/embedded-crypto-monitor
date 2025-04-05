@@ -8,18 +8,11 @@ typedef struct {
     double px;           // Price
     double sz;           // Size/volume
     long ts;             // Timestamp
-} measurement;
+} measurement_t;
 
-class Measurement {
-   private:
-    measurement m;
-
-   public:
-    Measurement(const std::string instId, double px, double sz, long ts);
-    ~Measurement();
-
-    void displayMeasurement();
-    static std::vector<measurement> readMeasurementsFromFile(const int window,
-                                                             long timestamp);
-    void writeMeasurementToFile();
-};
+namespace Measurement {
+    measurement_t create(const std::string instId, double px, double sz, long ts);
+    void displayMeasurement(const measurement_t& m);
+    std::vector<measurement_t> readMeasurementsFromFile(const int window, long timestamp);
+    void writeMeasurementToFile(const measurement_t& m);
+}
