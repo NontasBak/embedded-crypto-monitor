@@ -1,5 +1,6 @@
 #include "pearson.hpp"
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <iostream>
@@ -45,7 +46,6 @@ double Pearson::calculatePearson(const std::vector<double>& x,
     xMean /= n;
     yMean /= n;
 
-    // Calculate correlation components
     double numerator = 0;
     double xDenominator = 0;
     double yDenominator = 0;
@@ -100,23 +100,11 @@ std::vector<double> getAveragesFromSymbol(
     return averagesSlice;
 }
 
-// void addPearsonCorrelation(const std::string& symbol1, const std::string&
-// symbol2,
-//                           double pearsonValue, long currentTimestamp, long
-//                           slidingTimestamp) {
-//     std::string pearsonStr = symbol1 + "-" + symbol2 + " " +
-//                            std::to_string(pearsonValue) + " " +
-//                            std::to_string(currentTimestamp) + " " +
-//                            std::to_string(slidingTimestamp);
-//     std::cout << "Pearson correlation: " << pearsonStr << std::endl;
-//     Pearson::writePearsonToFile(pearsonValue);
-// }
-
 void* Pearson::calculateAllPearson(void* arg) {
     calculatePearsonArgs* args = (calculatePearsonArgs*)arg;
     const long currentTimestamp = args->timestampInMs;
     const std::vector<std::string>& SYMBOLS = args->SYMBOLS;
-    const int PEARSON_WINDOW = 5;
+    const int PEARSON_WINDOW = 8;
 
     const std::vector<average_t> averages =
         MovingAverage::readAveragesFromFile(currentTimestamp);
@@ -152,8 +140,7 @@ void* Pearson::calculateAllPearson(void* arg) {
 
             for (int i = 0; i < numOfSlides; i++) {
                 std::vector<double> averagesSlice2(
-                    averages2.begin() + i,
-                    averages2.begin() + i + PEARSON_WINDOW);
+                    averages2.end() - i - PEARSON_WINDOW, averages2.end() - i);
 
                 double pearsonValue =
                     calculatePearson(averages1, averagesSlice2);
@@ -171,11 +158,18 @@ void* Pearson::calculateAllPearson(void* arg) {
             }
         }
 
+        // Measure delay
+        auto now = std::chrono::system_clock::now();
+        auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             now.time_since_epoch())
+                             .count();
+        int delay = timestamp - currentTimestamp;
+
         if (!pearsonValues.empty()) {
             size_t maximumIndex = findMaximumIndex(pearsonValues);
             writePearsonToFile(symbol1, symbol2arr[maximumIndex],
                                pearsonValues[maximumIndex], currentTimestamp,
-                               slidingTimestamps[maximumIndex], 0);
+                               slidingTimestamps[maximumIndex], delay);
         }
     }
 
