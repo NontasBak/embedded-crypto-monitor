@@ -1,3 +1,5 @@
+#include <unistd.h>  // For usleep
+
 #include <csignal>
 #include <iostream>
 #include <vector>
@@ -35,17 +37,47 @@ int main() {
 
     // Connect to the WebSocket server
     if (!OkxClient::connect(client)) {
-        std::cerr << "Failed to connect to WebSocket" << std::endl;
-        return 1;
+        std::cerr << "Failed to initial connection to WebSocket" << std::endl;
     }
 
     Scheduler::start(*scheduler);
     std::cout << "Crypto monitor is running. Press Ctrl+C to exit."
               << std::endl;
 
-    // Main event loop
-    while (running && OkxClient::isConnected(client)) {
-        lws_service(OkxClient::getContext(client), 100);
+    // Main event loop with reconnection logic
+    // since the connection is pretty unstable
+    int reconnect_attempts = 0;
+    const int max_reconnects = 10;
+    const int reconnect_delay_ms = 5000;  // 5 seconds
+
+    while (running) {
+        if (!OkxClient::isConnected(client)) {
+            if (reconnect_attempts < max_reconnects) {
+                std::cout << "Connection lost. Attempting to reconnect ("
+                          << reconnect_attempts + 1 << "/" << max_reconnects
+                          << ")..." << std::endl;
+
+                // Wait before reconnecting
+                usleep(reconnect_delay_ms * 1000);
+
+                if (OkxClient::connect(client)) {
+                    std::cout << "Reconnection successful" << std::endl;
+                    reconnect_attempts = 0;
+                } else {
+                    reconnect_attempts++;
+                    std::cerr << "Reconnection attempt failed" << std::endl;
+                    continue;
+                }
+            } else {
+                std::cerr << "Maximum reconnection attempts reached. Exiting."
+                          << std::endl;
+                break;
+            }
+        }
+
+        if (OkxClient::isConnected(client)) {
+            lws_service(OkxClient::getContext(client), 100);
+        }
     }
 
     Scheduler::stop(*scheduler);

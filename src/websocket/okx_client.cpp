@@ -22,7 +22,6 @@ okx_client_t OkxClient::create(const std::vector<std::string>& symbols) {
     client.symbols = symbols;
     client.context = nullptr;
     client.client_wsi = nullptr;
-    current_client = &client;
     return client;
 }
 
@@ -44,6 +43,13 @@ bool OkxClient::connect(okx_client_t& client) {
     info.uid = -1;
     info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
 
+    // Add these options for better connection stability
+    info.retry_and_idle_policy = NULL;  // Use defaults
+    info.connect_timeout_secs = 30;     // Increase from default
+    info.ka_time = 30;                  // Keep-alive time in seconds
+    info.ka_interval = 10;              // Keep-alive interval
+    info.ka_probes = 3;                 // Number of keep-alive probes
+
     client.context = lws_create_context(&info);
     if (!client.context) {
         std::cerr << "lws init failed" << std::endl;
@@ -62,9 +68,17 @@ bool OkxClient::connect(okx_client_t& client) {
     ccinfo.protocol = protocols[0].name;
     ccinfo.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED;
 
+    // Add retry settings
+    ccinfo.retry_and_idle_policy = NULL;  // Use defaults
+
     std::cout << "Connecting to OKX WebSocket..." << std::endl;
     client.client_wsi = lws_client_connect_via_info(&ccinfo);
-    current_client = &client;
+
+    // Store the pointer after establishing connection attempt
+    if (client.client_wsi != nullptr) {
+        current_client = &client;
+    }
+
     return client.client_wsi != nullptr;
 }
 
@@ -125,7 +139,7 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
                             std::stol(response["ts"].get<std::string>()));
 
                         // Measurement::displayMeasurement(measurement);
-                        Measurement::writeMeasurementToFile(measurement);
+                        Measurement::storeMeasurement(measurement);
                     }
                 } catch (const std::exception& e) {
                     std::cerr << "Error parsing JSON: " << e.what()
@@ -141,6 +155,24 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
             if (current_client) {
                 current_client->client_wsi = nullptr;
             }
+            break;
+
+        case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+            std::cerr << "WebSocket connection error: ";
+            if (in) {
+                std::cerr << (char*)in;
+            } else {
+                std::cerr << "(no error message)";
+            }
+            std::cerr << std::endl;
+
+            if (current_client) {
+                current_client->client_wsi = nullptr;
+            }
+            break;
+
+        case LWS_CALLBACK_WSI_DESTROY:
+            std::cout << "WebSocket interface destroyed" << std::endl;
             break;
 
         default:

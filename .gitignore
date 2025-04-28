@@ -45,3 +45,5 @@ crypto_monitor
 
 # Producer-consumer
 producer_consumer.c
+
+.vscode/*

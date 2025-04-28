@@ -4,6 +4,9 @@ CXX = g++
 # Compiler flags
 CXXFLAGS = -std=c++14 -Wall -I./src
 
+# For debugging, use this
+# CXXFLAGS = -std=c++14 -Wall -I./src -g -O0
+
 # Libraries to link
 LIBS = -lwebsockets -lpthread
 
@@ -21,6 +24,10 @@ TARGET = crypto_monitor
 
 # The main build rule
 all: $(TARGET)
+
+# Debug target
+# debug: CXXFLAGS += -DDEBUG
+# debug: $(TARGET)
 
 # How to build the executable
 $(TARGET): $(SOURCES)
