@@ -4,25 +4,61 @@
 
 #include <chrono>
 #include <iostream>
+#include <mutex>
 
 #include "../measurement/measurement.hpp"
 
-int MovingAverage::window = 15 * 60 * 1000;  // In milliseconds
+const long MovingAverage::AVERAGE_HISTORY_MS =
+    60 * 60 * 1000;  // 60 minutes in milliseconds
+std::map<std::string, std::deque<average_t>> MovingAverage::latestAverages;
+std::mutex MovingAverage::averagesMutex;
+int MovingAverage::window = 15 * 60 * 1000;  // 15 minutes in milliseconds
+
+void MovingAverage::cleanupOldAverages(const std::string& symbol,
+                                       long currentTimestamp) {
+    std::deque<average_t>& symbolAverages = latestAverages[symbol];
+    while (!symbolAverages.empty() &&
+           (currentTimestamp - symbolAverages.front().timestamp >
+            AVERAGE_HISTORY_MS)) {
+        symbolAverages.pop_front();
+    }
+}
+
+std::vector<double> MovingAverage::getRecentAverages(const std::string& symbol,
+                                                     long timestamp,
+                                                     size_t window) {
+    std::vector<double> result;
+
+    const std::deque<average_t>& averages = latestAverages[symbol];
+
+    // Determine starting position based on window size
+    // The latest values are at the end of the deque
+    // If window is 0, return all values
+    size_t startPos =
+        averages.size() > window && window > 0 ? averages.size() - window : 0;
+
+    for (size_t i = startPos; i < averages.size(); i++) {
+        result.push_back(averages.at(i).average);
+    }
+
+    return result;
+}
 
 void* MovingAverage::calculateAverage(void* arg) {
     calculateAverageArgs* args = (calculateAverageArgs*)arg;
 
-    std::vector<measurement_t> measurements =
-        Measurement::readMeasurementsFromFile(window, args->timestampInMs);
-
     for (const std::string& symbol : args->SYMBOLS) {
-        std::vector<measurement_t> measurementsForSymbol;
+        // Lock
+        std::lock_guard<std::mutex> lock(Measurement::measurementsMutex);
 
-        for (const measurement_t& meas : measurements) {
-            if (meas.instId == symbol) {
-                measurementsForSymbol.push_back(meas);
-            }
-        }
+        // Cleanup and get recent measurements
+        Measurement::cleanupOldMeasurements(symbol, args->timestampInMs);
+        std::vector<measurement_t> measurementsForSymbol =
+            Measurement::getRecentMeasurements(symbol, window,
+                                               args->timestampInMs);
+
+        // Unlock
+        Measurement::measurementsMutex.unlock();
 
         double weightedAveragePrice = 0;
         double totalVolume = 0;
@@ -42,9 +78,9 @@ void* MovingAverage::calculateAverage(void* arg) {
                              .count();
         int delay = timestamp - args->timestampInMs;
 
-        // Add results to txt file
-        MovingAverage::writeAverageToFile(symbol, average, args->timestampInMs,
-                                          delay);
+        // Add results to memory and txt file
+        MovingAverage::storeAverage(symbol, average, args->timestampInMs,
+                                    delay);
 
         std::cout << "Moving average for " << symbol << ": " << average
                   << std::endl;
@@ -53,87 +89,26 @@ void* MovingAverage::calculateAverage(void* arg) {
     return nullptr;
 }
 
-std::vector<average_t> MovingAverage::readAveragesFromFile(long timestamp) {
-    FILE* fp = fopen("data/average.txt", "r");
-    if (fp == NULL) {
-        std::cerr << "Error opening file" << std::endl;
-        throw std::runtime_error("Failed to open average file");
-    }
+void MovingAverage::storeAverage(std::string symbol, double average,
+                                 long timestamp, int delay) {
+    average_t avg;
+    avg.symbol = symbol;
+    avg.average = average;
+    avg.timestamp = timestamp;
 
-    std::vector<average_t> averages;
-    const int MAX_LINE = 1024;
-    char buffer[MAX_LINE];
+    latestAverages[symbol].push_back(avg);
 
-    // Move to the end of the file
-    fseek(fp, 0, SEEK_END);
-    long fileSize = ftell(fp);
-
-    // Start from the end and move backwards
-    long position = fileSize;
-
-    // Read the file backwards line by line
-    while (position > 0) {
-        // Move back until we find a newline or reach the beginning
-        long i;
-        for (i = position - 1; i >= 0; i--) {
-            fseek(fp, i, SEEK_SET);
-            char c = fgetc(fp);
-            if (c == '\n' || i == 0) {
-                break;
-            }
-        }
-
-        // Read the line
-        fseek(fp, i == 0 ? 0 : i + 1, SEEK_SET);
-        if (fgets(buffer, MAX_LINE, fp) != NULL) {
-            // Parse the line
-            average_t a;
-            char symbol[32];  // Adjust size as needed
-            sscanf(buffer, "%s %lf %ld", symbol, &a.average, &a.timestamp);
-            a.symbol = std::string(symbol);
-
-            averages.push_back(a);
-        }
-
-        // Move position to before the line we just read
-        position = i;
-
-        // Break if we've reached the start of the file
-        if (i == 0) {
-            break;
-        }
-    }
-
-    fclose(fp);
-
-    // Display all measurements
-    // std::cout << "Measurements within the time window (" << windowMs
-    //           << "ms):" << std::endl;
-    // std::cout << "---------------------------------------------------"
-    //           << std::endl;
-    // for (const auto& meas : measurements) {
-    //     std::cout << meas.instId << " " << meas.px << " " << meas.sz << " "
-    //               << meas.ts << std::endl;
-    // }
-    // std::cout << "---------------------------------------------------"
-    //           << std::endl;
-    // std::cout << "Total measurements: " << measurements.size() << std::endl;
-
-    return averages;
-}
-
-void MovingAverage::writeAverageToFile(std::string symbol, double average,
-                                       long timestamp, int delay) {
+    // Write to file
     std::string filename = "data/average.txt";
 
-    // open the file for writing
+    // Open the file for writing
     FILE* fp = fopen(filename.c_str(), "a");
     if (fp == NULL) {
         std::cout << "Error opening the file " << filename << std::endl;
         return;
     }
 
-    // write to the text file
+    // Write to the text file
     fprintf(fp, "%s %.6f %ld %d\n", symbol.c_str(), average, timestamp, delay);
 
     fclose(fp);

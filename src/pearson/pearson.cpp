@@ -82,36 +82,15 @@ size_t findMaximumIndex(const std::vector<double>& arr) {
     return maxIndex;
 }
 
-std::vector<double> getAveragesFromSymbol(
-    const std::string& symbol, const std::vector<average_t>& averages,
-    int window = 0) {
-    std::vector<double> averagesSlice;
-    int windowCounter = 1;
-
-    for (const auto& average : averages) {
-        if (average.symbol == symbol) {
-            if (window != 0 && windowCounter > window) {
-                break;
-            }
-            averagesSlice.push_back(average.average);
-            windowCounter++;
-        }
-    }
-    return averagesSlice;
-}
-
 void* Pearson::calculateAllPearson(void* arg) {
     calculatePearsonArgs* args = (calculatePearsonArgs*)arg;
     const long currentTimestamp = args->timestampInMs;
     const std::vector<std::string>& SYMBOLS = args->SYMBOLS;
-    const int PEARSON_WINDOW = 8;
-
-    const std::vector<average_t> averages =
-        MovingAverage::readAveragesFromFile(currentTimestamp);
+    const int PEARSON_WINDOW = 5;
 
     for (const auto& symbol1 : SYMBOLS) {
         std::vector<double> averages1 =
-            getAveragesFromSymbol(symbol1, averages, PEARSON_WINDOW);
+            MovingAverage::getRecentAverages(symbol1, currentTimestamp, PEARSON_WINDOW);
 
         if (averages1.size() < PEARSON_WINDOW) {
             return nullptr;
@@ -123,7 +102,7 @@ void* Pearson::calculateAllPearson(void* arg) {
 
         for (const auto& symbol2 : SYMBOLS) {
             std::vector<double> averages2 =
-                getAveragesFromSymbol(symbol2, averages);
+                MovingAverage::getRecentAverages(symbol2, currentTimestamp);
 
             const size_t n = averages2.size();
 
@@ -134,19 +113,15 @@ void* Pearson::calculateAllPearson(void* arg) {
                 numOfSlides = n - PEARSON_WINDOW - 1;
             }
 
-            // std::cout << "numOfSlides: " << numOfSlides << std::endl;
-
             if (numOfSlides <= 0) continue;
 
             for (int i = 0; i < numOfSlides; i++) {
                 std::vector<double> averagesSlice2(
-                    averages2.end() - i - PEARSON_WINDOW, averages2.end() - i);
+                    averages2.begin() + i, averages2.begin() + i + PEARSON_WINDOW);
 
                 double pearsonValue =
                     calculatePearson(averages1, averagesSlice2);
 
-                // std::cout << "Pearson correlation for " << symbol1 << " and "
-                //           << symbol2 << ": " << pearsonValue << std::endl;
                 pearsonValues.push_back(pearsonValue);
 
                 // Starting timestamp of window

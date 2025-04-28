@@ -2,7 +2,17 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <deque>
 #include <iostream>
+#include <map>
+#include <mutex>
+
+// Initialize in-memory storage
+std::map<std::string, std::deque<measurement_t>>
+    Measurement::latestMeasurements;
+std::mutex Measurement::measurementsMutex;
+const long Measurement::MEASUREMENT_WINDOW_MS =
+    15 * 60 * 1000;  // 15 minutes in milliseconds
 
 measurement_t Measurement::create(const std::string instId, double px,
                                   double sz, long ts) {
@@ -19,82 +29,33 @@ void Measurement::displayMeasurement(const measurement_t& m) {
               << std::endl;
 };
 
-std::vector<measurement_t> Measurement::readMeasurementsFromFile(
-    const int windowMs, long timestamp) {
-    FILE* fp = fopen("data/measurement.txt", "r");
-    if (fp == NULL) {
-        std::cerr << "Error opening file" << std::endl;
-        throw std::runtime_error("Failed to open measurement file");
+void Measurement::cleanupOldMeasurements(const std::string& symbol,
+                                         long currentTimestamp) {
+    std::deque<measurement_t>& symbolMeasurements = latestMeasurements[symbol];
+    while (!symbolMeasurements.empty() &&
+           (currentTimestamp - symbolMeasurements.front().ts >
+            MEASUREMENT_WINDOW_MS)) {
+        symbolMeasurements.pop_front();
     }
-
-    std::vector<measurement_t> measurements;
-    const int MAX_LINE = 1024;
-    char buffer[MAX_LINE];
-
-    // Move to the end of the file
-    fseek(fp, 0, SEEK_END);
-    long fileSize = ftell(fp);
-
-    // Start from the end and move backwards
-    long position = fileSize;
-
-    // Read the file backwards line by line
-    while (position > 0) {
-        // Move back until we find a newline or reach the beginning
-        long i;
-        for (i = position - 1; i >= 0; i--) {
-            fseek(fp, i, SEEK_SET);
-            char c = fgetc(fp);
-            if (c == '\n' || i == 0) {
-                break;
-            }
-        }
-
-        // Read the line
-        fseek(fp, i == 0 ? 0 : i + 1, SEEK_SET);
-        if (fgets(buffer, MAX_LINE, fp) != NULL) {
-            // Parse the line
-            measurement_t m;
-            char instId[32];  // Adjust size as needed
-            sscanf(buffer, "%s %lf %lf %ld", instId, &m.px, &m.sz, &m.ts);
-            m.instId = std::string(instId);
-
-            // Check if we're within the time window
-            if (timestamp - m.ts > windowMs) {
-                break;
-            }
-
-            measurements.push_back(m);
-        }
-
-        // Move position to before the line we just read
-        position = i;
-
-        // Break if we've reached the start of the file
-        if (i == 0) {
-            break;
-        }
-    }
-
-    fclose(fp);
-
-    // Display all measurements
-    // std::cout << "Measurements within the time window (" << windowMs
-    //           << "ms):" << std::endl;
-    // std::cout << "---------------------------------------------------"
-    //           << std::endl;
-    // for (const auto& meas : measurements) {
-    //     std::cout << meas.instId << " " << meas.px << " " << meas.sz << " "
-    //               << meas.ts << std::endl;
-    // }
-    // std::cout << "---------------------------------------------------"
-    //           << std::endl;
-    // std::cout << "Total measurements: " << measurements.size() << std::endl;
-
-    return measurements;
 }
 
-void Measurement::writeMeasurementToFile(const measurement_t& m) {
+std::vector<measurement_t> Measurement::getRecentMeasurements(
+    const std::string& symbol, const int windowMs, long timestamp) {
+    std::vector<measurement_t> result;
+
+    const std::deque<measurement_t>& measurements = latestMeasurements[symbol];
+    result.assign(measurements.begin(), measurements.end());
+
+    return result;
+}
+
+void Measurement::storeMeasurement(const measurement_t& m) {
+    // Store in memory first
+    std::lock_guard<std::mutex> lock(measurementsMutex);
+    latestMeasurements[m.instId].push_back(m);
+    measurementsMutex.unlock();
+
+    // Write to file
     std::string filename = "data/measurement.txt";
 
     // open the file for writing

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <deque>
+#include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -12,10 +15,17 @@ typedef struct {
 
 namespace Measurement {
 
+// In-memory storage for measurements (last 15 minutes)
+extern std::map<std::string, std::deque<measurement_t>> latestMeasurements;
+extern std::mutex measurementsMutex;
+extern const long MEASUREMENT_WINDOW_MS;  // 15 minutes in milliseconds
+
 measurement_t create(const std::string instId, double px, double sz, long ts);
 void displayMeasurement(const measurement_t& m);
-std::vector<measurement_t> readMeasurementsFromFile(const int window,
-                                                    long timestamp);
-void writeMeasurementToFile(const measurement_t& m);
+std::vector<measurement_t> getRecentMeasurements(const std::string& symbol,
+                                                 const int windowMs,
+                                                 long timestamp);
+void storeMeasurement(const measurement_t& m);
+void cleanupOldMeasurements(const std::string& symbol, long currentTimestamp);
 
 }  // namespace Measurement

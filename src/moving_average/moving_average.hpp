@@ -2,6 +2,9 @@
 
 #include <pthread.h>
 
+#include <deque>
+#include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -18,11 +21,16 @@ typedef struct {
 
 namespace MovingAverage {
 
-extern int window;  // In milliseconds
+extern int window;
+extern const long AVERAGE_HISTORY_MS;  // 60 minutes history in milliseconds
+extern std::map<std::string, std::deque<average_t>> latestAverages;
+extern std::mutex averagesMutex;
 
-void writeAverageToFile(std::string symbol, double average, long timestamp,
-                        int delay);
+void storeAverage(std::string symbol, double average, long timestamp,
+                  int delay);
+void cleanupOldAverages(const std::string& symbol, long currentTimestamp);
 void* calculateAverage(void* arg);
-std::vector<average_t> readAveragesFromFile(long timestamp);
+std::vector<double> getRecentAverages(const std::string& symbol, long timestamp,
+                                      size_t window = 0);
 
 }  // namespace MovingAverage
