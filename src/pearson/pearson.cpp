@@ -1,11 +1,14 @@
 #include "pearson.hpp"
 
+#include <pthread.h>
+
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <iostream>
 
 #include "../moving_average/moving_average.hpp"
+#include "../scheduler/scheduler.hpp"
 
 void Pearson::writePearsonToFile(std::string symbol1, std::string symbol2,
                                  double pearson, long timestamp,
@@ -86,11 +89,11 @@ void* Pearson::calculateAllPearson(void* arg) {
     calculatePearsonArgs* args = (calculatePearsonArgs*)arg;
     const long currentTimestamp = args->timestampInMs;
     const std::vector<std::string>& SYMBOLS = args->SYMBOLS;
-    const int PEARSON_WINDOW = 5;
+    const int PEARSON_WINDOW = 8;
 
     for (const auto& symbol1 : SYMBOLS) {
-        std::vector<double> averages1 =
-            MovingAverage::getRecentAverages(symbol1, currentTimestamp, PEARSON_WINDOW);
+        std::vector<double> averages1 = MovingAverage::getRecentAverages(
+            symbol1, currentTimestamp, PEARSON_WINDOW);
 
         if (averages1.size() < PEARSON_WINDOW) {
             return nullptr;
@@ -117,7 +120,8 @@ void* Pearson::calculateAllPearson(void* arg) {
 
             for (int i = 0; i < numOfSlides; i++) {
                 std::vector<double> averagesSlice2(
-                    averages2.begin() + i, averages2.begin() + i + PEARSON_WINDOW);
+                    averages2.begin() + i,
+                    averages2.begin() + i + PEARSON_WINDOW);
 
                 double pearsonValue =
                     calculatePearson(averages1, averagesSlice2);
@@ -133,7 +137,6 @@ void* Pearson::calculateAllPearson(void* arg) {
             }
         }
 
-        // Measure delay
         auto now = std::chrono::system_clock::now();
         auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
                              now.time_since_epoch())
@@ -146,6 +149,34 @@ void* Pearson::calculateAllPearson(void* arg) {
                                pearsonValues[maximumIndex], currentTimestamp,
                                slidingTimestamps[maximumIndex], delay);
         }
+    }
+
+    return nullptr;
+}
+
+void* Pearson::workerThread(void* arg) {
+    scheduler_t* scheduler = (scheduler_t*)arg;
+
+    while (scheduler->running) {
+        // Wait for work signal
+        pthread_mutex_lock(&scheduler->pearsonMutex);
+        while (!scheduler->pearsonWorkReady && scheduler->running) {
+            pthread_cond_wait(&scheduler->pearsonCondition,
+                              &scheduler->pearsonMutex);
+        }
+
+        if (!scheduler->running) {
+            pthread_mutex_unlock(&scheduler->pearsonMutex);
+            break;
+        }
+
+        scheduler->pearsonWorkReady = false;
+        long timestamp = scheduler->currentTimestamp;
+        std::vector<std::string> symbols = scheduler->SYMBOLS;
+        pthread_mutex_unlock(&scheduler->pearsonMutex);
+
+        calculatePearsonArgs args = {symbols, timestamp};
+        calculateAllPearson(&args);
     }
 
     return nullptr;

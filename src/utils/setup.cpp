@@ -9,14 +9,11 @@
 
 const std::string Setup::dataPath = "data/";
 const std::string Setup::files[] = {"measurement.txt", "average.txt",
-                                    "pearson.txt"};
+                                    "pearson.txt", "cpu_stats.txt"};
 
 void Setup::initializeFiles() {
-    // Create the data directory
     int status = mkdir(dataPath.c_str(), 0777);
 
-    // If directory creation failed and it's not because the directory already
-    // exists
     if (status != 0 && errno != EEXIST) {
         std::cerr << "Error creating directory " << dataPath << ": "
                   << strerror(errno) << std::endl;

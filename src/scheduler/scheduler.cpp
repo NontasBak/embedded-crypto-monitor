@@ -8,10 +8,11 @@
 #include <cmath>
 #include <iostream>
 
+#include "../measurement/measurement.hpp"
 #include "../moving_average/moving_average.hpp"
 #include "../pearson/pearson.hpp"
+#include "../utils/cpu_stats.hpp"
 
-// Store a reference to the active scheduler
 static scheduler_t* active_scheduler = nullptr;
 
 void* schedulerThreadFunction(void* args) {
@@ -24,17 +25,35 @@ scheduler_t* Scheduler::create(std::vector<std::string> SYMBOLS) {
     scheduler_t* scheduler = new scheduler_t();
     scheduler->SYMBOLS = SYMBOLS;
     scheduler->running = false;
+
+    pthread_cond_init(&scheduler->averageCondition, nullptr);
+    pthread_cond_init(&scheduler->pearsonCondition, nullptr);
+    pthread_mutex_init(&scheduler->averageMutex, nullptr);
+    pthread_mutex_init(&scheduler->pearsonMutex, nullptr);
+    scheduler->averageWorkReady = false;
+    scheduler->pearsonWorkReady = false;
+
     return scheduler;
 }
 
-void Scheduler::destroy(scheduler_t& scheduler) { stop(scheduler); }
+void Scheduler::destroy(scheduler_t& scheduler) {
+    stop(scheduler);
+
+    pthread_cond_destroy(&scheduler.averageCondition);
+    pthread_cond_destroy(&scheduler.pearsonCondition);
+    pthread_mutex_destroy(&scheduler.averageMutex);
+    pthread_mutex_destroy(&scheduler.pearsonMutex);
+}
 
 void Scheduler::start(scheduler_t& scheduler) {
     if (!scheduler.running) {
         scheduler.running = true;
         active_scheduler = &scheduler;
 
-        // Create the scheduler thread
+        pthread_create(&scheduler.threadAverage, nullptr,
+                       MovingAverage::workerThread, &scheduler);
+        pthread_create(&scheduler.threadPearson, nullptr, Pearson::workerThread,
+                       &scheduler);
         pthread_create(&scheduler.threadScheduler, nullptr,
                        schedulerThreadFunction, &scheduler);
     }
@@ -43,10 +62,21 @@ void Scheduler::start(scheduler_t& scheduler) {
 void Scheduler::stop(scheduler_t& scheduler) {
     if (scheduler.running) {
         scheduler.running = false;
-        void* result;
-        if (pthread_join(scheduler.threadScheduler, &result) != 0) {
-            std::cerr << "Failed to join pthread" << std::endl;
-        }
+
+        // Signal worker threads to wake up and exit
+        pthread_mutex_lock(&scheduler.averageMutex);
+        scheduler.averageWorkReady = true;
+        pthread_cond_signal(&scheduler.averageCondition);
+        pthread_mutex_unlock(&scheduler.averageMutex);
+
+        pthread_mutex_lock(&scheduler.pearsonMutex);
+        scheduler.pearsonWorkReady = true;
+        pthread_cond_signal(&scheduler.pearsonCondition);
+        pthread_mutex_unlock(&scheduler.pearsonMutex);
+
+        pthread_join(scheduler.threadScheduler, nullptr);
+        pthread_join(scheduler.threadAverage, nullptr);
+        pthread_join(scheduler.threadPearson, nullptr);
     }
 }
 
@@ -68,19 +98,26 @@ void Scheduler::run(scheduler_t& scheduler) {
             return;
         }
 
-        calculateAverageArgs argsAverage = {scheduler.SYMBOLS,
-                                            nextMinuteTimestampInMs};
-        calculatePearsonArgs argsPearson = {scheduler.SYMBOLS,
-                                            nextMinuteTimestampInMs};
+        scheduler.currentTimestamp = nextMinuteTimestampInMs;
 
-        // Create moving average and Pearson calculation threads
-        pthread_create(&scheduler.threadAverage, nullptr,
-                       MovingAverage::calculateAverage, (void*)&argsAverage);
-        pthread_create(&scheduler.threadPearson, nullptr,
-                       Pearson::calculateAllPearson, (void*)&argsPearson);
+        Measurement::cleanupOldMeasurements(scheduler.currentTimestamp);
 
-        // Wait for the threads to finish
-        pthread_join(scheduler.threadAverage, nullptr);
-        pthread_join(scheduler.threadPearson, nullptr);
+        // Calculate and write CPU stats
+        double cpuIdlePercentage = CpuStats::getCpuIdlePercentage();
+        if (cpuIdlePercentage >= 0.0) {
+            CpuStats::writeCpuStats(scheduler.currentTimestamp,
+                                    cpuIdlePercentage);
+        }
+
+        // Signal worker threads to start working
+        pthread_mutex_lock(&scheduler.averageMutex);
+        scheduler.averageWorkReady = true;
+        pthread_cond_signal(&scheduler.averageCondition);
+        pthread_mutex_unlock(&scheduler.averageMutex);
+
+        pthread_mutex_lock(&scheduler.pearsonMutex);
+        scheduler.pearsonWorkReady = true;
+        pthread_cond_signal(&scheduler.pearsonCondition);
+        pthread_mutex_unlock(&scheduler.pearsonMutex);
     }
 }

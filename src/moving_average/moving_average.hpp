@@ -30,6 +30,7 @@ void storeAverage(std::string symbol, double average, long timestamp,
                   int delay);
 void cleanupOldAverages(const std::string& symbol, long currentTimestamp);
 void* calculateAverage(void* arg);
+void* workerThread(void* arg);
 std::vector<double> getRecentAverages(const std::string& symbol, long timestamp,
                                       size_t window = 0);
 

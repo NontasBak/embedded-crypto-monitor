@@ -12,6 +12,15 @@ typedef struct {
     pthread_t threadPearson;
     std::atomic<bool> running;
     std::vector<std::string> SYMBOLS;
+
+    // Synchronization primitives
+    pthread_cond_t averageCondition;
+    pthread_cond_t pearsonCondition;
+    pthread_mutex_t averageMutex;
+    pthread_mutex_t pearsonMutex;
+    bool averageWorkReady;
+    bool pearsonWorkReady;
+    long currentTimestamp;
 } scheduler_t;
 
 namespace Scheduler {

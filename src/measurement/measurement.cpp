@@ -12,7 +12,7 @@ std::map<std::string, std::deque<measurement_t>>
     Measurement::latestMeasurements;
 std::mutex Measurement::measurementsMutex;
 const long Measurement::MEASUREMENT_WINDOW_MS =
-    15 * 60 * 1000;  // 15 minutes in milliseconds
+    15 * 60 * 1000;  // 15 minutes
 
 measurement_t Measurement::create(const std::string instId, double px,
                                   double sz, long ts) {
@@ -29,13 +29,14 @@ void Measurement::displayMeasurement(const measurement_t& m) {
               << std::endl;
 };
 
-void Measurement::cleanupOldMeasurements(const std::string& symbol,
-                                         long currentTimestamp) {
-    std::deque<measurement_t>& symbolMeasurements = latestMeasurements[symbol];
-    while (!symbolMeasurements.empty() &&
-           (currentTimestamp - symbolMeasurements.front().ts >
-            MEASUREMENT_WINDOW_MS)) {
-        symbolMeasurements.pop_front();
+void Measurement::cleanupOldMeasurements(long currentTimestamp) {
+    for (auto& pair : latestMeasurements) {
+        std::deque<measurement_t>& symbolMeasurements = pair.second;
+        while (!symbolMeasurements.empty() &&
+               (currentTimestamp - symbolMeasurements.front().ts >
+                MEASUREMENT_WINDOW_MS)) {
+            symbolMeasurements.pop_front();
+        }
     }
 }
 
@@ -65,8 +66,15 @@ void Measurement::storeMeasurement(const measurement_t& m) {
         return;
     }
 
+    auto now = std::chrono::system_clock::now();
+    auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         now.time_since_epoch())
+                         .count();
+    auto delay = timestamp - m.ts;
+
     // write to the text file
-    fprintf(fp, "%s %.6f %.6f %ld\n", m.instId.c_str(), m.px, m.sz, m.ts);
+    fprintf(fp, "%s %.6f %.6f %ld %ld\n", m.instId.c_str(), m.px, m.sz, m.ts,
+            delay);
 
     fclose(fp);
 };

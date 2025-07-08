@@ -45,7 +45,7 @@ bool OkxClient::connect(okx_client_t& client) {
 
     // Add these options for better connection stability
     info.retry_and_idle_policy = NULL;  // Use defaults
-    info.connect_timeout_secs = 30;     // Increase from default
+    // info.connect_timeout_secs = 30;     // Increase from default
     info.ka_time = 30;                  // Keep-alive time in seconds
     info.ka_interval = 10;              // Keep-alive interval
     info.ka_probes = 3;                 // Number of keep-alive probes

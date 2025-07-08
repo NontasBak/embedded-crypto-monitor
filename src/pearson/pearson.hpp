@@ -16,6 +16,7 @@ void writePearsonToFile(std::string symbol1, std::string symbol2,
                         double pearson, long timestamp, long maxTimestamp,
                         int delay);
 void* calculateAllPearson(void* arg);
+void* workerThread(void* arg);
 double calculatePearson(const std::vector<double>& x,
                         const std::vector<double>& y);
 

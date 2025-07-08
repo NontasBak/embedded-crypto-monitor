@@ -26,6 +26,6 @@ std::vector<measurement_t> getRecentMeasurements(const std::string& symbol,
                                                  const int windowMs,
                                                  long timestamp);
 void storeMeasurement(const measurement_t& m);
-void cleanupOldMeasurements(const std::string& symbol, long currentTimestamp);
+void cleanupOldMeasurements(long currentTimestamp);
 
 }  // namespace Measurement
