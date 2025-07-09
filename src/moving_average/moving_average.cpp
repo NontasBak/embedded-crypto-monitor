@@ -28,6 +28,8 @@ void MovingAverage::cleanupOldAverages(const std::string& symbol,
 std::vector<double> MovingAverage::getRecentAverages(const std::string& symbol,
                                                      long timestamp,
                                                      size_t window) {
+    std::lock_guard<std::mutex> lock(averagesMutex);
+    
     std::vector<double> result;
 
     const std::deque<average_t>& averages = latestAverages[symbol];
@@ -41,6 +43,8 @@ std::vector<double> MovingAverage::getRecentAverages(const std::string& symbol,
     for (size_t i = startPos; i < averages.size(); i++) {
         result.push_back(averages.at(i).average);
     }
+
+    averagesMutex.unlock();
 
     return result;
 }
@@ -78,7 +82,7 @@ void* MovingAverage::calculateAverage(void* arg) {
 
     for (const std::string& symbol : args->SYMBOLS) {
         // Lock
-        // std::lock_guard<std::mutex> lock(Measurement::measurementsMutex);
+        std::lock_guard<std::mutex> lock(Measurement::measurementsMutex);
 
         // Get recent measurements (cleanup is now handled by scheduler)
         std::vector<measurement_t> measurementsForSymbol =
@@ -86,7 +90,7 @@ void* MovingAverage::calculateAverage(void* arg) {
                                                args->timestampInMs);
 
         // Unlock
-        // Measurement::measurementsMutex.unlock();
+        Measurement::measurementsMutex.unlock();
 
         double weightedAveragePrice = 0;
         double totalVolume = 0;
@@ -122,7 +126,11 @@ void MovingAverage::storeAverage(std::string symbol, double average,
     avg.average = average;
     avg.timestamp = timestamp;
 
+    std::lock_guard<std::mutex> lock(averagesMutex);
+
     latestAverages[symbol].push_back(avg);
+
+    averagesMutex.unlock();
 
     std::string filename = "data/average.txt";
 
