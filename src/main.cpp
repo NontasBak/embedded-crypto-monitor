@@ -61,15 +61,28 @@ int main() {
                 usleep(reconnect_delay_ms * 1000);
 
                 if (OkxClient::connect(client)) {
-                    // Add a small delay to verify connection stability
-                    usleep(3 * 1000 * 1000); // 3 second delay
+                    // Wait up to 5 seconds for subscription confirmation
+                    int wait_attempts = 0;
+                    const int max_wait_attempts = 100;  // 10 seconds total
+
+                    while (wait_attempts < max_wait_attempts &&
+                           !OkxClient::isConnected(client)) {
+                        lws_service(OkxClient::getContext(client), 100);
+                        usleep(100 * 1000);  // 100ms
+                        wait_attempts++;
+                    }
 
                     if (OkxClient::isConnected(client)) {
-                        std::cout << "Reconnection successful and stable" << std::endl;
+                        std::cout << "Reconnection successful and subscription "
+                                     "confirmed"
+                                  << std::endl;
                         reconnect_attempts = 0;
                     } else {
                         reconnect_attempts++;
-                        std::cerr << "Reconnection was unstable, retrying..." << std::endl;
+                        std::cerr << "Connection established but subscription "
+                                     "failed, retrying..."
+                                  << std::endl;
+                        OkxClient::destroy(client);
                         continue;
                     }
                 } else {

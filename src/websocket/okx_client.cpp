@@ -22,6 +22,7 @@ okx_client_t OkxClient::create(const std::vector<std::string>& symbols) {
     client.symbols = symbols;
     client.context = nullptr;
     client.client_wsi = nullptr;
+    client.subscription_confirmed = false;
     return client;
 }
 
@@ -46,9 +47,9 @@ bool OkxClient::connect(okx_client_t& client) {
     // Add these options for better connection stability
     info.retry_and_idle_policy = NULL;  // Use defaults
     // info.connect_timeout_secs = 30;     // Increase from default
-    info.ka_time = 30;                  // Keep-alive time in seconds
-    info.ka_interval = 10;              // Keep-alive interval
-    info.ka_probes = 3;                 // Number of keep-alive probes
+    info.ka_time = 30;      // Keep-alive time in seconds
+    info.ka_interval = 10;  // Keep-alive interval
+    info.ka_probes = 3;     // Number of keep-alive probes
 
     client.context = lws_create_context(&info);
     if (!client.context) {
@@ -113,6 +114,7 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
         case LWS_CALLBACK_CLIENT_ESTABLISHED:
             std::cout << "WebSocket connection established" << std::endl;
             if (current_client) {
+                current_client->subscription_confirmed = false;
                 sendSubscription(*current_client);
             }
             break;
@@ -129,7 +131,13 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
                 try {
                     nlohmann::json response = nlohmann::json::parse(rx_buffer);
 
-                    if (response.contains("data")) {
+                    if (response.contains("event") &&
+                        response["event"] == "subscribe") {
+                        if (current_client) {
+                            current_client->subscription_confirmed = true;
+                            std::cout << "Subscription confirmed" << std::endl;
+                        }
+                    } else if (response.contains("data")) {
                         response = response["data"][0];
 
                         measurement_t measurement = Measurement::create(
@@ -183,7 +191,7 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
 }
 
 bool OkxClient::isConnected(const okx_client_t& client) {
-    return client.client_wsi != nullptr;
+    return client.client_wsi != nullptr && client.subscription_confirmed;
 }
 
 lws_context* OkxClient::getContext(const okx_client_t& client) {

@@ -12,6 +12,7 @@ typedef struct {
     std::vector<std::string> symbols;
     struct lws_context* context;
     struct lws* client_wsi;
+    bool subscription_confirmed;  // Add this field
 } okx_client_t;
 
 namespace OkxClient {
