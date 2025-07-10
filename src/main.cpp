@@ -47,7 +47,7 @@ int main() {
     // Main event loop with reconnection logic
     // since the connection is pretty unstable
     int reconnect_attempts = 0;
-    const int max_reconnects = 10;
+    const int max_reconnects = 50;
     const int reconnect_delay_ms = 5000;  // 5 seconds
 
     while (running) {
@@ -61,8 +61,17 @@ int main() {
                 usleep(reconnect_delay_ms * 1000);
 
                 if (OkxClient::connect(client)) {
-                    std::cout << "Reconnection successful" << std::endl;
-                    reconnect_attempts = 0;
+                    // Add a small delay to verify connection stability
+                    usleep(3 * 1000 * 1000); // 3 second delay
+
+                    if (OkxClient::isConnected(client)) {
+                        std::cout << "Reconnection successful and stable" << std::endl;
+                        reconnect_attempts = 0;
+                    } else {
+                        reconnect_attempts++;
+                        std::cerr << "Reconnection was unstable, retrying..." << std::endl;
+                        continue;
+                    }
                 } else {
                     reconnect_attempts++;
                     std::cerr << "Reconnection attempt failed" << std::endl;
