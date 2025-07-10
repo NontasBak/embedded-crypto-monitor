@@ -56,8 +56,8 @@ void Measurement::storeMeasurement(const measurement_t& m) {
     latestMeasurements[m.instId].push_back(m);
     measurementsMutex.unlock();
 
-    // Write to file
-    std::string filename = "data/measurement.txt";
+    // Write to symbol-specific file
+    std::string filename = "data/meas_" + m.instId + ".txt";
 
     // open the file for writing
     FILE* fp = fopen(filename.c_str(), "a");
@@ -73,8 +73,6 @@ void Measurement::storeMeasurement(const measurement_t& m) {
     auto delay = timestamp - m.ts;
 
     // write to the text file
-    fprintf(fp, "%s %.6f %.6f %ld %ld\n", m.instId.c_str(), m.px, m.sz, m.ts,
-            delay);
-
+    fprintf(fp, "%.6f %.6f %ld %ld\n", m.px, m.sz, m.ts, delay);
     fclose(fp);
-};
+}
