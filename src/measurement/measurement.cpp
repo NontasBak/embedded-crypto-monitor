@@ -10,7 +10,7 @@
 // Initialize in-memory storage
 std::map<std::string, std::deque<measurement_t>>
     Measurement::latestMeasurements;
-std::mutex Measurement::measurementsMutex;
+pthread_mutex_t Measurement::measurementsMutex;
 const long Measurement::MEASUREMENT_WINDOW_MS =
     15 * 60 * 1000;  // 15 minutes
 
@@ -52,9 +52,9 @@ std::vector<measurement_t> Measurement::getRecentMeasurements(
 
 void Measurement::storeMeasurement(const measurement_t& m) {
     // Store in memory first
-    std::lock_guard<std::mutex> lock(measurementsMutex);
+    pthread_mutex_lock(&measurementsMutex);
     latestMeasurements[m.instId].push_back(m);
-    measurementsMutex.unlock();
+    pthread_mutex_unlock(&measurementsMutex);
 
     // Write to symbol-specific file
     std::string filename = "data/meas_" + m.instId + ".txt";

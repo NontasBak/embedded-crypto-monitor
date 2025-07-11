@@ -12,7 +12,7 @@
 const long MovingAverage::AVERAGE_HISTORY_MS =
     60 * 60 * 1000;  // 60 minutes
 std::map<std::string, std::deque<average_t>> MovingAverage::latestAverages;
-std::mutex MovingAverage::averagesMutex;
+pthread_mutex_t MovingAverage::averagesMutex;
 int MovingAverage::window = 15 * 60 * 1000;  // 15 minutes
 
 void MovingAverage::cleanupOldAverages(const std::string& symbol,
@@ -28,7 +28,7 @@ void MovingAverage::cleanupOldAverages(const std::string& symbol,
 std::vector<double> MovingAverage::getRecentAverages(const std::string& symbol,
                                                      long timestamp,
                                                      size_t window) {
-    std::lock_guard<std::mutex> lock(averagesMutex);
+    pthread_mutex_lock(&averagesMutex);
     
     std::vector<double> result;
 
@@ -44,7 +44,7 @@ std::vector<double> MovingAverage::getRecentAverages(const std::string& symbol,
         result.push_back(averages.at(i).average);
     }
 
-    averagesMutex.unlock();
+    pthread_mutex_unlock(&averagesMutex);
 
     return result;
 }
@@ -82,7 +82,7 @@ void* MovingAverage::calculateAverage(void* arg) {
 
     for (const std::string& symbol : args->SYMBOLS) {
         // Lock
-        std::lock_guard<std::mutex> lock(Measurement::measurementsMutex);
+        pthread_mutex_lock(&Measurement::measurementsMutex);
 
         // Get recent measurements (cleanup is now handled by scheduler)
         std::vector<measurement_t> measurementsForSymbol =
@@ -90,7 +90,7 @@ void* MovingAverage::calculateAverage(void* arg) {
                                                args->timestampInMs);
 
         // Unlock
-        Measurement::measurementsMutex.unlock();
+        pthread_mutex_unlock(&Measurement::measurementsMutex);
 
         double weightedAveragePrice = 0;
         double totalVolume = 0;
@@ -126,11 +126,11 @@ void MovingAverage::storeAverage(std::string symbol, double average,
     avg.average = average;
     avg.timestamp = timestamp;
 
-    std::lock_guard<std::mutex> lock(averagesMutex);
+    pthread_mutex_lock(&averagesMutex);
 
     latestAverages[symbol].push_back(avg);
 
-    averagesMutex.unlock();
+    pthread_mutex_unlock(&averagesMutex);
 
     std::string filename = "data/average.txt";
 

@@ -24,7 +24,7 @@ namespace MovingAverage {
 extern int window;
 extern const long AVERAGE_HISTORY_MS;  // 60 minutes history in milliseconds
 extern std::map<std::string, std::deque<average_t>> latestAverages;
-extern std::mutex averagesMutex;
+extern pthread_mutex_t averagesMutex;
 
 void storeAverage(std::string symbol, double average, long timestamp,
                   int delay);
