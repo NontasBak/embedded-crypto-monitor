@@ -135,7 +135,8 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
                         response["event"] == "subscribe") {
                         if (current_client) {
                             current_client->subscription_confirmed = true;
-                            std::cout << "Subscription confirmed" << std::endl;
+                            // std::cout << "Subscription confirmed" <<
+                            // std::endl;
                         }
                     } else if (response.contains("data")) {
                         response = response["data"][0];
@@ -196,4 +197,23 @@ bool OkxClient::isConnected(const okx_client_t& client) {
 
 lws_context* OkxClient::getContext(const okx_client_t& client) {
     return client.context;
+}
+
+int OkxClient::waitForSubscriptions(okx_client_t& client) {
+    int wait_attempts = 0;
+    const int max_wait_attempts = 100;  // 10 seconds total
+
+    while (wait_attempts < max_wait_attempts && !isConnected(client)) {
+        lws_service(getContext(client), 100);
+        usleep(100 * 1000);  // 100ms
+        wait_attempts++;
+    }
+
+    if (isConnected(client)) {
+        std::cerr << "Subscriptions confirmed" << std::endl;
+        return 0;
+    } else {
+        std::cout << "Failed to create subscriptions" << std::endl;
+        return 1;
+    }
 }

@@ -29,5 +29,6 @@ bool isConnected(const okx_client_t& client);
 lws_context* getContext(const okx_client_t& client);
 int wsCallback(struct lws* wsi, enum lws_callback_reasons reason, void* user,
                void* in, size_t len);
+int waitForSubscriptions(okx_client_t& client);
 
 }  // namespace OkxClient

@@ -40,12 +40,13 @@ int main() {
         std::cerr << "Failed to initial connection to WebSocket" << std::endl;
     }
 
+    OkxClient::waitForSubscriptions(client);
+
     Scheduler::start(*scheduler);
     std::cout << "Crypto monitor is running. Press Ctrl+C to exit."
               << std::endl;
 
     // Main event loop with reconnection logic
-    // since the connection is pretty unstable
     int reconnect_attempts = 0;
     const int max_reconnects = 50;
     const int reconnect_delay_ms = 5000;  // 5 seconds
@@ -61,29 +62,18 @@ int main() {
                 usleep(reconnect_delay_ms * 1000);
 
                 if (OkxClient::connect(client)) {
-                    // Wait up to 5 seconds for subscription confirmation
-                    int wait_attempts = 0;
-                    const int max_wait_attempts = 100;  // 10 seconds total
-
-                    while (wait_attempts < max_wait_attempts &&
-                           !OkxClient::isConnected(client)) {
-                        lws_service(OkxClient::getContext(client), 100);
-                        usleep(100 * 1000);  // 100ms
-                        wait_attempts++;
-                    }
-
-                    if (OkxClient::isConnected(client)) {
-                        std::cout << "Reconnection successful and subscription "
-                                     "confirmed"
-                                  << std::endl;
-                        reconnect_attempts = 0;
-                    } else {
+                    if (!OkxClient::waitForSubscriptions(client)) {
                         reconnect_attempts++;
                         std::cerr << "Connection established but subscription "
                                      "failed, retrying..."
                                   << std::endl;
                         OkxClient::destroy(client);
                         continue;
+                    } else {
+                        std::cout << "Reconnection successful and subscription "
+                                     "confirmed"
+                                  << std::endl;
+                        reconnect_attempts = 0;
                     }
                 } else {
                     reconnect_attempts++;
