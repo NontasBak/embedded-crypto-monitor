@@ -62,7 +62,7 @@ int main() {
                 usleep(reconnect_delay_ms * 1000);
 
                 if (OkxClient::connect(client)) {
-                    if (!OkxClient::waitForSubscriptions(client)) {
+                    if (OkxClient::waitForSubscriptions(client)) {
                         reconnect_attempts++;
                         std::cerr << "Connection established but subscription "
                                      "failed, retrying..."
