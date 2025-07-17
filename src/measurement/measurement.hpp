@@ -2,7 +2,6 @@
 
 #include <deque>
 #include <map>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -23,7 +22,7 @@ extern const long MEASUREMENT_WINDOW_MS;  // 15 minutes in milliseconds
 measurement_t create(const std::string instId, double px, double sz, long ts);
 void displayMeasurement(const measurement_t& m);
 std::vector<measurement_t> getRecentMeasurements(const std::string& symbol,
-                                                 const int windowMs,
+                                                 const long windowMs,
                                                  long timestamp);
 void storeMeasurement(const measurement_t& m);
 void cleanupOldMeasurements(long currentTimestamp);

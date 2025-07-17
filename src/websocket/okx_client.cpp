@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include "../measurement/measurement.hpp"
+
 char OkxClient::rx_buffer[16384];
 int OkxClient::rx_buffer_len = 0;
 
@@ -207,6 +209,7 @@ int OkxClient::waitForSubscriptions(okx_client_t& client) {
         lws_service(getContext(client), 100);
         usleep(100 * 1000);  // 100ms
         wait_attempts++;
+        // std::cout << "Waiting for subscriptions..." << std::endl;
     }
 
     if (isConnected(client)) {

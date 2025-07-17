@@ -101,6 +101,7 @@ void Scheduler::run(scheduler_t& scheduler) {
         scheduler.currentTimestamp = nextMinuteTimestampInMs;
 
         Measurement::cleanupOldMeasurements(scheduler.currentTimestamp);
+        MovingAverage::cleanupOldAverages(scheduler.currentTimestamp);
 
         // Calculate and write CPU stats
         double cpuIdlePercentage = CpuStats::getCpuIdlePercentage();

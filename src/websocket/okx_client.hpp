@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "../measurement/measurement.hpp"
-
 typedef struct {
     std::vector<std::string> symbols;
     struct lws_context* context;

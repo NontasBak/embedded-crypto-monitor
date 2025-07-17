@@ -1,18 +1,17 @@
 #include "measurement.hpp"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdio>
 #include <deque>
 #include <iostream>
 #include <map>
-#include <mutex>
 
 // Initialize in-memory storage
 std::map<std::string, std::deque<measurement_t>>
     Measurement::latestMeasurements;
 pthread_mutex_t Measurement::measurementsMutex;
-const long Measurement::MEASUREMENT_WINDOW_MS =
-    15 * 60 * 1000;  // 15 minutes
+const long Measurement::MEASUREMENT_WINDOW_MS = 26 * 60 * 1000;  // 26 minutes
 
 measurement_t Measurement::create(const std::string instId, double px,
                                   double sz, long ts) {
@@ -41,10 +40,13 @@ void Measurement::cleanupOldMeasurements(long currentTimestamp) {
 }
 
 std::vector<measurement_t> Measurement::getRecentMeasurements(
-    const std::string& symbol, const int windowMs, long timestamp) {
+    const std::string& symbol, const long windowMs, long timestamp) {
     std::vector<measurement_t> result;
 
+    pthread_mutex_lock(&Measurement::measurementsMutex);
     const std::deque<measurement_t>& measurements = latestMeasurements[symbol];
+    pthread_mutex_unlock(&Measurement::measurementsMutex);
+
     result.assign(measurements.begin(), measurements.end());
 
     return result;

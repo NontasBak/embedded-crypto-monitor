@@ -156,6 +156,7 @@ void* Pearson::calculateAllPearson(void* arg) {
 
 void* Pearson::workerThread(void* arg) {
     scheduler_t* scheduler = (scheduler_t*)arg;
+    std::vector<std::string> symbols = scheduler->SYMBOLS;
 
     while (scheduler->running) {
         // Wait for work signal
@@ -172,7 +173,6 @@ void* Pearson::workerThread(void* arg) {
 
         scheduler->pearsonWorkReady = false;
         long timestamp = scheduler->currentTimestamp;
-        std::vector<std::string> symbols = scheduler->SYMBOLS;
         pthread_mutex_unlock(&scheduler->pearsonMutex);
 
         calculatePearsonArgs args = {symbols, timestamp};
