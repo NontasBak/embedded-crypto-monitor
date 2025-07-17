@@ -1,0 +1,13 @@
+{
+    "name": "crypto-monitor",
+    "compatibility_date": "2025-04-03",
+    "assets": {
+        "not_found_handling": "single-page-application"
+    },
+    "routes": [
+        {
+            "pattern": "crypto-monitor.nontasbak.com",
+            "custom_domain": true
+        }
+    ]
+}
