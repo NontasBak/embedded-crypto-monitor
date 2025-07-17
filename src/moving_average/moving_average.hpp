@@ -38,6 +38,11 @@ typedef struct {
     long timestamp;
 } distance_t;
 
+typedef struct {
+    std::vector<double> values;
+    std::vector<long> timestamps;
+} value_t;
+
 namespace MovingAverage {
 
 extern const long MA_WINDOW;
@@ -72,13 +77,15 @@ void* calculateSignal(std::vector<std::string> symbols, long currentTimestamp,
 void* calculateDistance(std::vector<std::string> symbols,
                         long currentTimestamp);
 void* workerThread(void* arg);
-std::vector<double> getRecentAverages(const std::string& symbol, long timestamp,
-                                      size_t window = 0);
-std::vector<double> getRecentMACD(const std::string& symbol, long timestamp,
-                                  size_t window = 0);
-std::vector<double> getRecentSignal(const std::string& symbol, long timestamp,
-                                    size_t window = 0);
-std::vector<double> getRecentDistance(const std::string& symbol, long timestamp,
-                                      size_t window = 0);
+value_t getRecentAverages(const std::string& symbol, long timestamp,
+                          size_t window = 0);
+value_t getRecentEMA(const std::string& symbol, long timestamp, size_t window,
+                     std::string type);
+value_t getRecentMACD(const std::string& symbol, long timestamp,
+                      size_t window = 0);
+value_t getRecentSignal(const std::string& symbol, long timestamp,
+                        size_t window = 0);
+value_t getRecentDistance(const std::string& symbol, long timestamp,
+                          size_t window = 0);
 
 }  // namespace MovingAverage

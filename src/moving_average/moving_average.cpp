@@ -88,18 +88,45 @@ void MovingAverage::cleanupOldAverages(long currentTimestamp) {
 //     }
 // }
 
-std::vector<double> MovingAverage::getRecentAverages(const std::string& symbol,
-                                                     long timestamp,
-                                                     size_t window) {
+value_t MovingAverage::getRecentAverages(const std::string& symbol,
+                                         long timestamp, size_t window) {
     pthread_mutex_lock(&averagesMutex);
 
-    std::vector<double> result;
+    value_t result;
     const std::deque<average_t>& averages = latestAverages[symbol];
 
     size_t startPos =
         averages.size() > window && window > 0 ? averages.size() - window : 0;
     for (size_t i = startPos; i < averages.size(); i++) {
-        result.push_back(averages.at(i).average);
+        result.values.push_back(averages.at(i).average);
+        result.timestamps.push_back(averages.at(i).timestamp);
+    }
+    pthread_mutex_unlock(&averagesMutex);
+
+    return result;
+}
+
+value_t MovingAverage::getRecentEMA(const std::string& symbol, long timestamp,
+                                    size_t window, std::string type) {
+    pthread_mutex_lock(&averagesMutex);
+
+    value_t result;
+    const std::deque<average_t>* averages;
+    if (type == "short") {
+        averages = &latestShortTermEMA[symbol];
+    } else if (type == "long") {
+        averages = &latestLongTermEMA[symbol];
+    } else {
+        std::cerr << "Invalid type: " << type << std::endl;
+        pthread_mutex_unlock(&averagesMutex);
+        return result;
+    }
+
+    size_t startPos =
+        averages->size() > window && window > 0 ? averages->size() - window : 0;
+    for (size_t i = startPos; i < averages->size(); i++) {
+        result.values.push_back(averages->at(i).average);
+        result.timestamps.push_back(averages->at(i).timestamp);
     }
     pthread_mutex_unlock(&averagesMutex);
 
@@ -426,56 +453,56 @@ void MovingAverage::storeAverage(std::string symbol, double average,
     fclose(fp);
 };
 
-std::vector<double> MovingAverage::getRecentMACD(const std::string& symbol,
-                                                 long timestamp,
-                                                 size_t window) {
+value_t MovingAverage::getRecentMACD(const std::string& symbol, long timestamp,
+                                     size_t window) {
     pthread_mutex_lock(&averagesMutex);
-    std::vector<double> result;
+    value_t result;
     const std::deque<macd_t>& macdData = latestMACD[symbol];
 
     size_t startPos =
         macdData.size() > window && window > 0 ? macdData.size() - window : 0;
 
     for (size_t i = startPos; i < macdData.size(); i++) {
-        result.push_back(macdData.at(i).macd);
+        result.values.push_back(macdData.at(i).macd);
+        result.timestamps.push_back(macdData.at(i).timestamp);
     }
     pthread_mutex_unlock(&averagesMutex);
 
     return result;
 }
 
-std::vector<double> MovingAverage::getRecentSignal(const std::string& symbol,
-                                                   long timestamp,
-                                                   size_t window) {
+value_t MovingAverage::getRecentSignal(const std::string& symbol,
+                                       long timestamp, size_t window) {
     pthread_mutex_lock(&averagesMutex);
 
-    std::vector<double> result;
+    value_t result;
     const std::deque<signal_t>& signalData = latestSignal[symbol];
 
     size_t startPos = signalData.size() > window && window > 0
                           ? signalData.size() - window
                           : 0;
     for (size_t i = startPos; i < signalData.size(); i++) {
-        result.push_back(signalData.at(i).signal);
+        result.values.push_back(signalData.at(i).signal);
+        result.timestamps.push_back(signalData.at(i).timestamp);
     }
     pthread_mutex_unlock(&averagesMutex);
 
     return result;
 }
 
-std::vector<double> MovingAverage::getRecentDistance(const std::string& symbol,
-                                                     long timestamp,
-                                                     size_t window) {
+value_t MovingAverage::getRecentDistance(const std::string& symbol,
+                                         long timestamp, size_t window) {
     pthread_mutex_lock(&averagesMutex);
 
-    std::vector<double> result;
+    value_t result;
     const std::deque<distance_t>& distanceData = latestDistance[symbol];
 
     size_t startPos = distanceData.size() > window && window > 0
                           ? distanceData.size() - window
                           : 0;
     for (size_t i = startPos; i < distanceData.size(); i++) {
-        result.push_back(distanceData.at(i).distance);
+        result.values.push_back(distanceData.at(i).distance);
+        result.timestamps.push_back(distanceData.at(i).timestamp);
     }
     pthread_mutex_unlock(&averagesMutex);
 

@@ -8,7 +8,7 @@ CXXFLAGS = -std=c++14 -Wall -I./src
 # CXXFLAGS = -std=c++14 -Wall -I./src -g -O0
 
 # Libraries to link
-LIBS = -lwebsockets -lpthread
+LIBS = -lwebsockets -lpthread -lcpp-httplib
 
 # Source files
 SOURCES = src/main.cpp \
@@ -18,7 +18,8 @@ SOURCES = src/main.cpp \
           src/utils/cpu_stats.cpp \
           src/measurement/measurement.cpp \
           src/moving_average/moving_average.cpp \
-          src/pearson/pearson.cpp
+          src/pearson/pearson.cpp \
+          src/server/server.cpp
 
 # Name of executable
 TARGET = crypto_monitor

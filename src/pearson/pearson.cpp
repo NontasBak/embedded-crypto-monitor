@@ -92,8 +92,10 @@ void* Pearson::calculateAllPearson(void* arg) {
     const int PEARSON_WINDOW = 8;
 
     for (const auto& symbol1 : SYMBOLS) {
-        std::vector<double> averages1 = MovingAverage::getRecentAverages(
-            symbol1, currentTimestamp, PEARSON_WINDOW);
+        std::vector<double> averages1 =
+            MovingAverage::getRecentAverages(symbol1, currentTimestamp,
+                                             PEARSON_WINDOW)
+                .values;
 
         if (averages1.size() < PEARSON_WINDOW) {
             return nullptr;
@@ -105,7 +107,8 @@ void* Pearson::calculateAllPearson(void* arg) {
 
         for (const auto& symbol2 : SYMBOLS) {
             std::vector<double> averages2 =
-                MovingAverage::getRecentAverages(symbol2, currentTimestamp);
+                MovingAverage::getRecentAverages(symbol2, currentTimestamp)
+                    .values;
 
             const size_t n = averages2.size();
 
