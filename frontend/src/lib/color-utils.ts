@@ -202,7 +202,7 @@ export function parseColorFromFormat(value: string, format: ColorFormat): Color 
             // Parse OKLCH and convert to HSL as approximation
             const oklchMatch = value.match(/oklch\(([^)]+)\)/);
             if (oklchMatch) {
-                const parts = oklchMatch[1].split(/[\s\/]+/);
+                const parts = oklchMatch[1].split(/[\s/]+/);
                 const L = parseFloat(parts[0]) || 50;
                 const C = parseFloat(parts[1]) || 0;
                 const H = parseFloat(parts[2]) || 0;
@@ -217,7 +217,7 @@ export function parseColorFromFormat(value: string, format: ColorFormat): Color 
             // Parse LAB and convert to HSL as approximation
             const labMatch = value.match(/lab\(([^)]+)\)/);
             if (labMatch) {
-                const parts = labMatch[1].split(/[\s\/]+/);
+                const parts = labMatch[1].split(/[\s/]+/);
                 const L = parseFloat(parts[0]) || 50;
                 const a = parseFloat(parts[1]) || 0;
                 const b = parseFloat(parts[2]) || 0;

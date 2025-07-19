@@ -1,7 +1,36 @@
+/**
+ * Graph Component - Multi-line Chart for Cryptocurrency Analysis
+ *
+ * Usage Examples:
+ *
+ * // Display single indicator (distance)
+ * <Graph selectedSymbol="BTCUSDT" />
+ *
+ * // Display multiple indicators
+ * <Graph
+ *   selectedSymbol="BTCUSDT"
+ *   indicators={["sma", "ema_short", "ema_long", "macd"]}
+ * />
+ *
+ * // Display close price with technical indicators
+ * <Graph
+ *   selectedSymbol="ETHUSDT"
+ *   indicators={["close", "sma", "macd", "signal"]}
+ * />
+ *
+ * Available indicators:
+ * - "close": Closing price
+ * - "sma": Simple Moving Average
+ * - "ema_short": Short-term Exponential Moving Average
+ * - "ema_long": Long-term Exponential Moving Average
+ * - "macd": MACD indicator
+ * - "signal": Signal line
+ * - "distance": Distance metric
+ */
+
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
-import { SYMBOLS } from "@/lib/symbols";
 
 import {
     Card,
@@ -13,9 +42,20 @@ import {
 import {
     type ChartConfig,
     ChartContainer,
+    ChartLegend,
+    ChartLegendContent,
     ChartTooltip,
     ChartTooltipContent,
 } from "@/components/ui/chart";
+
+type IndicatorType =
+    | "close"
+    | "sma"
+    | "ema_short"
+    | "ema_long"
+    | "macd"
+    | "signal"
+    | "distance";
 
 type CryptoData = {
     [key: string]: {
@@ -26,14 +66,14 @@ type CryptoData = {
 
 type ChartDataPoint = {
     timestamp: number;
-    value: number;
     formattedTime: string;
+    [key: string]: number | string;
 };
 
-function initializeData(): CryptoData {
+function initializeData(indicators: IndicatorType[]): CryptoData {
     const initialData: CryptoData = {};
-    SYMBOLS.forEach((symbol) => {
-        initialData[symbol.name] = {
+    indicators.forEach((indicator) => {
+        initialData[indicator] = {
             values: [],
             timestamps: [],
         };
@@ -41,84 +81,196 @@ function initializeData(): CryptoData {
     return initialData;
 }
 
-const chartConfig = {
-    value: {
-        label: "Distance",
-        color: "#a48fff",
-    },
-} satisfies ChartConfig;
+const indicatorColors: Record<IndicatorType, string> = {
+    close: "#8884d8",
+    sma: "#82ca9d",
+    ema_short: "#ffc658",
+    ema_long: "#ff7c7c",
+    macd: "#a48fff",
+    signal: "#ff8042",
+    distance: "#00c5ff",
+};
 
-function Graph({ selectedSymbol }: { selectedSymbol: string }) {
-    const [SMAData, setSMAData] = useState<CryptoData>(initializeData());
-    const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+const indicatorLabels: Record<IndicatorType, string> = {
+    close: "Close Price",
+    sma: "SMA",
+    ema_short: "EMA Short",
+    ema_long: "EMA Long",
+    macd: "MACD",
+    signal: "Signal",
+    distance: "Distance",
+};
+
+function Graph({
+    selectedSymbol,
+    indicators = ["close"] as IndicatorType[],
+}: {
+    selectedSymbol: string;
+    indicators?: IndicatorType[];
+}) {
+    const [cryptoData, setCryptoData] = useState<CryptoData>(
+        initializeData(indicators),
+    );
 
     async function fetchData(
         symbol: string,
+        indicator: IndicatorType,
     ): Promise<{ data: { values: number[]; timestamps: number[] } }> {
-        return await axios.get(
-            `http://157.230.120.34:8080/distance?symbol=${symbol}&window=100`,
-        );
-    }
+        const baseUrl = "http://157.230.120.34:8080";
+        let url = "";
 
-    const dateFormatter = new Intl.DateTimeFormat(undefined, {
-        hour: "2-digit",
-        minute: "2-digit",
-    });
-
-    // Transform data for recharts
-    const transformDataForChart = (symbol: string): ChartDataPoint[] => {
-        const symbolData = SMAData[symbol];
-        if (!symbolData || symbolData.values.length === 0) {
-            return [];
+        switch (indicator) {
+            case "ema_short":
+                url = `${baseUrl}/ema?symbol=${symbol}&window=100&type=short`;
+                break;
+            case "ema_long":
+                url = `${baseUrl}/ema?symbol=${symbol}&window=100&type=long`;
+                break;
+            default:
+                url = `${baseUrl}/${indicator}?symbol=${symbol}&window=100`;
+                break;
         }
 
-        return symbolData.values.map((value, index) => ({
-            timestamp: symbolData.timestamps[index],
-            value: value,
-            formattedTime: dateFormatter.format(
-                new Date(symbolData.timestamps[index]),
-            ),
-        }));
-    };
+        return await axios.get(url);
+    }
 
-    useEffect(() => {
-        const promises = SYMBOLS.map(async (symbol) => {
-            try {
-                console.log(symbol);
-                const symbolData = await fetchData(symbol.name);
-                console.log(symbolData);
-                setSMAData((prevData) => ({
-                    ...prevData,
-                    [symbol.name]: {
-                        values: symbolData.data.values,
-                        timestamps: symbolData.data.timestamps,
-                    },
-                }));
-            } catch (error) {
-                console.error(`Error fetching data for ${symbol}:`, error);
+    // Transform data for recharts, combine all indicators
+    const chartData = useMemo((): ChartDataPoint[] => {
+        const dateFormatter = new Intl.DateTimeFormat(undefined, {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+        // Find the common timestamps across all indicators
+        const allTimestamps = new Set<number>();
+        indicators.forEach((indicator) => {
+            const indicatorData = cryptoData[indicator];
+            if (indicatorData && indicatorData.timestamps.length > 0) {
+                indicatorData.timestamps.forEach((ts) => allTimestamps.add(ts));
             }
         });
 
-        Promise.all(promises).then(() => {
-            console.log("Data fetched");
-        });
-    }, []);
+        const sortedTimestamps = Array.from(allTimestamps).sort(
+            (a, b) => a - b,
+        );
 
-    // Update chart data when selected symbol or SMA data changes
+        return sortedTimestamps.map((timestamp) => {
+            const dataPoint: ChartDataPoint = {
+                timestamp,
+                formattedTime: dateFormatter.format(new Date(timestamp)),
+            };
+
+            // Add values for each indicator at this timestamp
+            indicators.forEach((indicator) => {
+                const indicatorData = cryptoData[indicator];
+                if (indicatorData && indicatorData.timestamps.length > 0) {
+                    const index = indicatorData.timestamps.indexOf(timestamp);
+                    if (index !== -1) {
+                        dataPoint[indicator] = indicatorData.values[index];
+                    }
+                }
+            });
+
+            return dataPoint;
+        });
+    }, [cryptoData, indicators]);
+
+    // Calculate Y-axis domain based on data range
+    const yAxisDomain = useMemo(() => {
+        if (chartData.length === 0) return [0, 100];
+
+        let min = Infinity;
+        let max = -Infinity;
+
+        chartData.forEach((dataPoint) => {
+            indicators.forEach((indicator) => {
+                const value = dataPoint[indicator];
+                if (typeof value === "number" && !isNaN(value)) {
+                    min = Math.min(min, value);
+                    max = Math.max(max, value);
+                }
+            });
+        });
+
+        if (min === Infinity || max === -Infinity) return [0, 100];
+
+        // 5% padding to top and bottom
+        const padding = (max - min) * 0.05;
+        return [min - padding, max + padding];
+    }, [chartData, indicators]);
+
+    // Create dynamic chart config
+    const createChartConfig = (): ChartConfig => {
+        const config: ChartConfig = {};
+        indicators.forEach((indicator) => {
+            config[indicator] = {
+                label: indicatorLabels[indicator],
+                color: indicatorColors[indicator],
+            };
+        });
+        return config;
+    };
+
     useEffect(() => {
-        const newChartData = transformDataForChart(selectedSymbol);
-        console.log("Chart data for", selectedSymbol, ":", newChartData);
-        console.log("Chart data length:", newChartData.length);
-        console.log("Sample data point:", newChartData[0]);
-        setChartData(newChartData);
-    }, [selectedSymbol, SMAData]);
+        const fetchAllData = async () => {
+            try {
+                const promises = indicators.map(async (indicator) => {
+                    try {
+                        const indicatorData = await fetchData(
+                            selectedSymbol,
+                            indicator,
+                        );
+
+                        return {
+                            indicator,
+                            data: {
+                                values: indicatorData.data.values,
+                                timestamps: indicatorData.data.timestamps,
+                            },
+                        };
+                    } catch (error) {
+                        console.error(
+                            `Error fetching data for ${indicator}:`,
+                            error,
+                        );
+                    }
+                });
+
+                const results = await Promise.all(promises);
+
+                // Filter out null results (failed requests) and build the update object
+                const dataUpdates = results.reduce((acc, result) => {
+                    if (result) {
+                        acc[result.indicator] = result.data;
+                    }
+                    return acc;
+                }, {} as CryptoData);
+                setCryptoData(dataUpdates);
+                console.log("All data fetched and set");
+            } catch (error) {
+                console.error("Error in fetchAllData:", error);
+            }
+        };
+
+        // Reset data when symbol or indicators change
+        setCryptoData(initializeData(indicators));
+        fetchAllData();
+    }, [selectedSymbol, indicators]);
+
+    // Log chart data changes
+    // useEffect(() => {
+    //     console.log("Chart data for", selectedSymbol, ":", chartData);
+    //     console.log("Chart data length:", chartData.length);
+    //     console.log("Sample data point:", chartData[0]);
+    // }, [chartData, selectedSymbol]);
+
+    const chartConfig = createChartConfig();
 
     return (
         <Card className="w-full">
             <CardHeader>
-                <CardTitle>Crypto Distance Chart</CardTitle>
+                <CardTitle>Crypto Analysis Chart</CardTitle>
                 <CardDescription>
-                    Showing distance values for {selectedSymbol} (
+                    Showing {indicators.join(", ")} for {selectedSymbol} (
                     {chartData.length} data points)
                 </CardDescription>
             </CardHeader>
@@ -149,7 +301,7 @@ function Graph({ selectedSymbol }: { selectedSymbol: string }) {
                             />
                             <XAxis
                                 dataKey="formattedTime"
-                                tickLine={false}
+                                tickLine={true}
                                 axisLine={false}
                                 tickMargin={8}
                                 minTickGap={32}
@@ -158,13 +310,13 @@ function Graph({ selectedSymbol }: { selectedSymbol: string }) {
                                 width={50}
                                 tickLine={false}
                                 axisLine={false}
-                                tickMargin={8}
+                                tickMargin={0}
+                                domain={yAxisDomain}
                             />
                             <ChartTooltip
                                 content={
                                     <ChartTooltipContent
-                                        className="w-[150px]"
-                                        nameKey="value"
+                                        className="w-[200px]"
                                         labelFormatter={(value) => {
                                             const dataPoint = chartData.find(
                                                 (d) =>
@@ -179,14 +331,19 @@ function Graph({ selectedSymbol }: { selectedSymbol: string }) {
                                     />
                                 }
                             />
-                            <Line
-                                dataKey="value"
-                                type="monotone"
-                                stroke="#a48fff"
-                                strokeWidth={3}
-                                dot={false}
-                                strokeOpacity={1}
-                            />
+                            {indicators.map((indicator) => (
+                                <Line
+                                    key={indicator}
+                                    dataKey={indicator}
+                                    type="monotone"
+                                    stroke={indicatorColors[indicator]}
+                                    strokeWidth={2}
+                                    dot={false}
+                                    strokeOpacity={1}
+                                    connectNulls={false}
+                                />
+                            ))}
+                            <ChartLegend content={<ChartLegendContent />} />
                         </LineChart>
                     </ChartContainer>
                 )}
