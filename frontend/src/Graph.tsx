@@ -28,7 +28,14 @@
  * - "distance": Distance metric
  */
 
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import {
+    CartesianGrid,
+    Line,
+    LineChart,
+    ReferenceLine,
+    XAxis,
+    YAxis,
+} from "recharts";
 import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 
@@ -342,8 +349,8 @@ function Graph({
             <CardHeader>
                 <CardTitle>Crypto Analysis Chart</CardTitle>
                 <CardDescription>
-                    Showing {indicators.join(", ")} for {selectedSymbol} (
-                    {chartData.length} data points)
+                    Showing {indicators.join(", ")} for {selectedSymbol} (last{" "}
+                    {chartData.length} minutes)
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -417,6 +424,14 @@ function Graph({
                                     connectNulls={false}
                                 />
                             ))}
+                            {indicators.includes("distance") && (
+                                <ReferenceLine
+                                    y={0}
+                                    stroke="#666666"
+                                    strokeDasharray="5 5"
+                                    strokeOpacity={0.6}
+                                />
+                            )}
                             <ChartLegend content={<ChartLegendContent />} />
                         </LineChart>
                     </ChartContainer>
