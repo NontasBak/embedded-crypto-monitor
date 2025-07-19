@@ -1,9 +1,9 @@
 import Graph from "./Graph";
 
-function Content() {
+function Content({ selectedSymbol }: { selectedSymbol: string }) {
     return (
         <div className="w-1/2 m-4">
-            <Graph />
+            <Graph selectedSymbol={selectedSymbol} />
         </div>
     );
 }

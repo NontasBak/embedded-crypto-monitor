@@ -1,6 +1,7 @@
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { SYMBOLS } from "@/lib/symbols";
 
 import {
     Card,
@@ -15,17 +16,6 @@ import {
     ChartTooltip,
     ChartTooltipContent,
 } from "@/components/ui/chart";
-
-const SYMBOLS: string[] = [
-    "BTC-USDT",
-    "ADA-USDT",
-    "ETH-USDT",
-    "DOGE-USDT",
-    "XRP-USDT",
-    "SOL-USDT",
-    "LTC-USDT",
-    "BNB-USDT",
-];
 
 type CryptoData = {
     [key: string]: {
@@ -43,7 +33,7 @@ type ChartDataPoint = {
 function initializeData(): CryptoData {
     const initialData: CryptoData = {};
     SYMBOLS.forEach((symbol) => {
-        initialData[symbol] = {
+        initialData[symbol.name] = {
             values: [],
             timestamps: [],
         };
@@ -58,16 +48,15 @@ const chartConfig = {
     },
 } satisfies ChartConfig;
 
-function Graph() {
+function Graph({ selectedSymbol }: { selectedSymbol: string }) {
     const [SMAData, setSMAData] = useState<CryptoData>(initializeData());
-    const [selectedSymbol, setSelectedSymbol] = useState<string>(SYMBOLS[0]);
     const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
     async function fetchData(
         symbol: string,
     ): Promise<{ data: { values: number[]; timestamps: number[] } }> {
         return await axios.get(
-            `http://localhost:8080/distance?symbol=${symbol}&window=100`,
+            `http://157.230.120.34:8080/distance?symbol=${symbol}&window=100`,
         );
     }
 
@@ -95,11 +84,12 @@ function Graph() {
     useEffect(() => {
         const promises = SYMBOLS.map(async (symbol) => {
             try {
-                const symbolData = await fetchData(symbol);
+                console.log(symbol);
+                const symbolData = await fetchData(symbol.name);
                 console.log(symbolData);
                 setSMAData((prevData) => ({
                     ...prevData,
-                    [symbol]: {
+                    [symbol.name]: {
                         values: symbolData.data.values,
                         timestamps: symbolData.data.timestamps,
                     },

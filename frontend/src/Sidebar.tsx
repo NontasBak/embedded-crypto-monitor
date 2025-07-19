@@ -11,19 +11,15 @@ import {
     SidebarProvider,
 } from "@/components/ui/sidebar";
 import { Coins } from "lucide-react";
+import { SYMBOLS } from "@/lib/symbols";
 
-const SYMBOLS = [
-    { title: "Btc", url: "#", icon: "btc" },
-    { title: "Ada", url: "#", icon: "ada" },
-    { title: "Eth", url: "#", icon: "eth" },
-    { title: "Doge", url: "#", icon: "dog" },
-    { title: "Xrp", url: "#", icon: "xrp" },
-    { title: "Sol", url: "#", icon: "sol" },
-    { title: "Ltc", url: "#", icon: "ltc" },
-    { title: "Bnb", url: "#", icon: "bnb" },
-];
-
-function AppSidebar() {
+function AppSidebar({
+    selectedSymbol,
+    setSelectedSymbol,
+}: {
+    selectedSymbol: string;
+    setSelectedSymbol: (symbol: string) => void;
+}) {
     return (
         <SidebarProvider>
             <Sidebar>
@@ -41,8 +37,18 @@ function AppSidebar() {
                                             asChild
                                             size="lg"
                                             className="text-lg"
+                                            isActive={
+                                                selectedSymbol === symbol.name
+                                            }
                                         >
-                                            <a href={symbol.url}>
+                                            <a
+                                                href={symbol.url}
+                                                onClick={() =>
+                                                    setSelectedSymbol(
+                                                        symbol.name,
+                                                    )
+                                                }
+                                            >
                                                 <TokenIcon
                                                     symbol={symbol.icon}
                                                     variant="mono"
