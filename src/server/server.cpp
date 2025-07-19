@@ -70,6 +70,12 @@ void HTTPServer::setupRoutes() {
                 [this](const httplib::Request& req, httplib::Response& res) {
                     handleDistance(req, res);
                 });
+
+    // Closing price endpoint
+    server_.Get("/close",
+                [this](const httplib::Request& req, httplib::Response& res) {
+                    handleClosingPrice(req, res);
+                });
 }
 
 void HTTPServer::run() { server_.listen("0.0.0.0", port_); }
@@ -99,7 +105,7 @@ void HTTPServer::handleSMA(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(averages, "average");
+        std::string json = valueToJson(averages);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -134,7 +140,7 @@ void HTTPServer::handleEMA(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(emas, "average");
+        std::string json = valueToJson(emas);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -167,7 +173,7 @@ void HTTPServer::handleMACD(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(macd, "macd");
+        std::string json = valueToJson(macd);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -201,7 +207,7 @@ void HTTPServer::handleSignal(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(signals, "signal");
+        std::string json = valueToJson(signals);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -235,7 +241,7 @@ void HTTPServer::handleDistance(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(distances, "distance");
+        std::string json = valueToJson(distances);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -244,8 +250,41 @@ void HTTPServer::handleDistance(const httplib::Request& req,
     }
 }
 
-std::string HTTPServer::valueToJson(const value_t& data,
-                                    const std::string& key) {
+void HTTPServer::handleClosingPrice(const httplib::Request& req,
+                                    httplib::Response& res) {
+    if (!validateParameters(req, {"symbol", "window"})) {
+        res.status = 400;
+        res.set_content(
+            createErrorResponse("Missing symbol or window parameter"),
+            "application/json");
+        return;
+    }
+
+    try {
+        std::string symbol = req.get_param_value("symbol");
+        int window = std::stoi(req.get_param_value("window"));
+        long timestamp = getCurrentTimestamp();
+
+        value_t closingPrices =
+            DataCollector::getRecentClosingPrices(symbol, timestamp, window);
+
+        if (closingPrices.values.empty()) {
+            res.status = 404;
+            res.set_content(createErrorResponse("No data found for symbol"),
+                            "application/json");
+            return;
+        }
+
+        std::string json = valueToJson(closingPrices);
+        res.set_content(json, "application/json");
+    } catch (const std::exception& e) {
+        res.status = 400;
+        res.set_content(createErrorResponse("Invalid window parameter"),
+                        "application/json");
+    }
+}
+
+std::string HTTPServer::valueToJson(const value_t& data) {
     std::ostringstream json;
     json << "{\"values\": [";
 

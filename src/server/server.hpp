@@ -31,9 +31,11 @@ class HTTPServer {
     void handleMACD(const httplib::Request& req, httplib::Response& res);
     void handleSignal(const httplib::Request& req, httplib::Response& res);
     void handleDistance(const httplib::Request& req, httplib::Response& res);
+    void handleClosingPrice(const httplib::Request& req,
+                            httplib::Response& res);
 
     // Utility functions
-    std::string valueToJson(const value_t& data, const std::string& key);
+    std::string valueToJson(const value_t& data);
     std::string createErrorResponse(const std::string& message);
     long getCurrentTimestamp();
     bool validateParameters(const httplib::Request& req,
