@@ -50,11 +50,11 @@ void* DataCollector::workerThread(void* arg) {
         pthread_mutex_unlock(&scheduler->averageMutex);
 
         calculateAverage(symbols, timestamp);
-        calculateAllExponentialAverages(symbols, timestamp);
-        calculateMACD(symbols, timestamp);
-        calculateSignal(symbols, timestamp, SIGNAL_WINDOW);
-        calculateDistance(symbols, timestamp);
-        calculateClosingPrice(symbols, timestamp);
+        // calculateAllExponentialAverages(symbols, timestamp);
+        // calculateMACD(symbols, timestamp);
+        // calculateSignal(symbols, timestamp, SIGNAL_WINDOW);
+        // calculateDistance(symbols, timestamp);
+        // calculateClosingPrice(symbols, timestamp);
 
         // for (const std::string& symbol : symbols) {
         //     cleanupOldAverages(symbol, timestamp);

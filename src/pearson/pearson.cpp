@@ -66,7 +66,7 @@ double Pearson::calculatePearson(const std::vector<double>& x,
     }
 
     double correlation = numerator / sqrt(xDenominator * yDenominator);
-    return correlation;
+    return fabs(correlation);
 }
 
 size_t findMaximumIndex(const std::vector<double>& arr) {

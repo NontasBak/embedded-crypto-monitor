@@ -11,7 +11,7 @@
 std::map<std::string, std::deque<measurement_t>>
     Measurement::latestMeasurements;
 pthread_mutex_t Measurement::measurementsMutex;
-const long Measurement::MEASUREMENT_WINDOW_MS = 26 * 60 * 1000;  // 26 minutes
+const long Measurement::MEASUREMENT_WINDOW_MS = 15 * 60 * 1000;  // 15 minutes
 
 measurement_t Measurement::create(double px, double sz, long ts) {
     measurement_t m;

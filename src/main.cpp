@@ -43,8 +43,8 @@ int main() {
 
     OkxClient::waitForSubscriptions(client);
 
-    HTTPServer server(8080);
-    server.start();
+    // HTTPServer server(8080);
+    // server.start();
 
     Scheduler::start(*scheduler);
     std::cout << "Crypto monitor is running. Press Ctrl+C to exit."
