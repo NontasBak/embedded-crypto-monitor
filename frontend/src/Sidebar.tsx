@@ -37,7 +37,11 @@ function AppSidebar() {
                             <SidebarMenu>
                                 {SYMBOLS.map((symbol) => (
                                     <SidebarMenuItem key={symbol.title}>
-                                        <SidebarMenuButton asChild size="lg" className="text-lg">
+                                        <SidebarMenuButton
+                                            asChild
+                                            size="lg"
+                                            className="text-lg"
+                                        >
                                             <a href={symbol.url}>
                                                 <TokenIcon
                                                     symbol={symbol.icon}

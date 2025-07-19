@@ -2,8 +2,19 @@ import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import {
+    type ChartConfig,
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
+} from "@/components/ui/chart";
 
 const SYMBOLS: string[] = [
     "BTC-USDT",
@@ -52,8 +63,12 @@ function Graph() {
     const [selectedSymbol, setSelectedSymbol] = useState<string>(SYMBOLS[0]);
     const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
-    async function fetchData(symbol: string): Promise<{ data: { values: number[]; timestamps: number[] } }> {
-        return await axios.get(`http://localhost:8080/distance?symbol=${symbol}&window=100`);
+    async function fetchData(
+        symbol: string,
+    ): Promise<{ data: { values: number[]; timestamps: number[] } }> {
+        return await axios.get(
+            `http://localhost:8080/distance?symbol=${symbol}&window=100`,
+        );
     }
 
     const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -71,7 +86,9 @@ function Graph() {
         return symbolData.values.map((value, index) => ({
             timestamp: symbolData.timestamps[index],
             value: value,
-            formattedTime: dateFormatter.format(new Date(symbolData.timestamps[index])),
+            formattedTime: dateFormatter.format(
+                new Date(symbolData.timestamps[index]),
+            ),
         }));
     };
 
@@ -111,7 +128,8 @@ function Graph() {
             <CardHeader>
                 <CardTitle>Crypto Distance Chart</CardTitle>
                 <CardDescription>
-                    Showing distance values for {selectedSymbol} ({chartData.length} data points)
+                    Showing distance values for {selectedSymbol} (
+                    {chartData.length} data points)
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -120,7 +138,10 @@ function Graph() {
                         Loading chart data...
                     </div>
                 ) : (
-                    <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                    <ChartContainer
+                        config={chartConfig}
+                        className="h-[300px] w-full"
+                    >
                         <LineChart
                             accessibilityLayer
                             data={chartData}
@@ -131,7 +152,11 @@ function Graph() {
                                 bottom: 12,
                             }}
                         >
-                            <CartesianGrid vertical={true} horizontal={true} strokeDasharray="3 3" />
+                            <CartesianGrid
+                                vertical={true}
+                                horizontal={true}
+                                strokeDasharray="3 3"
+                            />
                             <XAxis
                                 dataKey="formattedTime"
                                 tickLine={false}
@@ -139,7 +164,12 @@ function Graph() {
                                 tickMargin={8}
                                 minTickGap={32}
                             />
-                            <YAxis width={50} tickLine={false} axisLine={false} tickMargin={8} />
+                            <YAxis
+                                width={50}
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={8}
+                            />
                             <ChartTooltip
                                 content={
                                     <ChartTooltipContent
@@ -147,10 +177,13 @@ function Graph() {
                                         nameKey="value"
                                         labelFormatter={(value) => {
                                             const dataPoint = chartData.find(
-                                                (d) => d.formattedTime === value,
+                                                (d) =>
+                                                    d.formattedTime === value,
                                             );
                                             return dataPoint
-                                                ? new Date(dataPoint.timestamp).toLocaleString()
+                                                ? new Date(
+                                                      dataPoint.timestamp,
+                                                  ).toLocaleString()
                                                 : value;
                                         }}
                                     />
