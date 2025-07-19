@@ -13,10 +13,8 @@ std::map<std::string, std::deque<measurement_t>>
 pthread_mutex_t Measurement::measurementsMutex;
 const long Measurement::MEASUREMENT_WINDOW_MS = 26 * 60 * 1000;  // 26 minutes
 
-measurement_t Measurement::create(const std::string instId, double px,
-                                  double sz, long ts) {
+measurement_t Measurement::create(double px, double sz, long ts) {
     measurement_t m;
-    m.instId = instId;
     m.px = px;
     m.sz = sz;
     m.ts = ts;
@@ -24,8 +22,7 @@ measurement_t Measurement::create(const std::string instId, double px,
 };
 
 void Measurement::displayMeasurement(const measurement_t& m) {
-    std::cout << m.instId << " " << m.px << " " << m.sz << " " << m.ts
-              << std::endl;
+    std::cout << m.px << " " << m.sz << " " << m.ts << std::endl;
 };
 
 void Measurement::cleanupOldMeasurements(long currentTimestamp) {
@@ -52,14 +49,15 @@ std::vector<measurement_t> Measurement::getRecentMeasurements(
     return result;
 }
 
-void Measurement::storeMeasurement(const measurement_t& m) {
+void Measurement::storeMeasurement(const std::string& symbol,
+                                   const measurement_t& m) {
     // Store in memory first
     pthread_mutex_lock(&measurementsMutex);
-    latestMeasurements[m.instId].push_back(m);
+    latestMeasurements[symbol].push_back(m);
     pthread_mutex_unlock(&measurementsMutex);
 
     // Write to symbol-specific file
-    std::string filename = "data/meas_" + m.instId + ".txt";
+    std::string filename = "data/meas_" + symbol + ".txt";
 
     // open the file for writing
     FILE* fp = fopen(filename.c_str(), "a");

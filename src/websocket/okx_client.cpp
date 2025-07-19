@@ -144,13 +144,13 @@ int OkxClient::wsCallback(struct lws* wsi, enum lws_callback_reasons reason,
                         response = response["data"][0];
 
                         measurement_t measurement = Measurement::create(
-                            response["instId"],
                             std::stod(response["px"].get<std::string>()),
                             std::stod(response["sz"].get<std::string>()),
                             std::stol(response["ts"].get<std::string>()));
 
                         // Measurement::displayMeasurement(measurement);
-                        Measurement::storeMeasurement(measurement);
+                        Measurement::storeMeasurement(response["instId"],
+                                                      measurement);
                     }
                 } catch (const std::exception& e) {
                     std::cerr << "Error parsing JSON: " << e.what()

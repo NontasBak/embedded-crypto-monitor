@@ -1,3 +1,5 @@
+#include "data_collector.hpp"
+
 #include <pthread.h>
 
 #include <chrono>
@@ -5,7 +7,6 @@
 
 #include "../measurement/measurement.hpp"
 #include "../scheduler/scheduler.hpp"
-#include "data_collector.hpp"
 
 const long DataCollector::MA_WINDOW = 15 * 60 * 1000;   // 15 minutes
 const long DataCollector::EMA_WINDOW = 28 * 60 * 1000;  // 26 minutes
