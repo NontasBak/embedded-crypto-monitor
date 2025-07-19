@@ -20,3 +20,8 @@ Finally, run it with
 ```bash
 make run
 ```
+
+To cross compile, run
+```bash
+make rpi
+```
