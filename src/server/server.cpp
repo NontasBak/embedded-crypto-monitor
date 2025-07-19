@@ -90,7 +90,7 @@ void HTTPServer::handleSMA(const httplib::Request& req,
         long timestamp = getCurrentTimestamp();
 
         value_t averages =
-            MovingAverage::getRecentAverages(symbol, timestamp, window);
+            DataCollector::getRecentAverages(symbol, timestamp, window);
 
         if (averages.values.empty()) {
             res.status = 404;
@@ -125,7 +125,7 @@ void HTTPServer::handleEMA(const httplib::Request& req,
         long timestamp = getCurrentTimestamp();
 
         value_t emas =
-            MovingAverage::getRecentEMA(symbol, timestamp, window, type);
+            DataCollector::getRecentEMA(symbol, timestamp, window, type);
 
         if (emas.values.empty()) {
             res.status = 404;
@@ -158,7 +158,7 @@ void HTTPServer::handleMACD(const httplib::Request& req,
         int window = std::stoi(req.get_param_value("window"));
         long timestamp = getCurrentTimestamp();
 
-        value_t macd = MovingAverage::getRecentMACD(symbol, timestamp, window);
+        value_t macd = DataCollector::getRecentMACD(symbol, timestamp, window);
 
         if (macd.values.empty()) {
             res.status = 404;
@@ -192,7 +192,7 @@ void HTTPServer::handleSignal(const httplib::Request& req,
         long timestamp = getCurrentTimestamp();
 
         value_t signals =
-            MovingAverage::getRecentSignal(symbol, timestamp, window);
+            DataCollector::getRecentSignal(symbol, timestamp, window);
 
         if (signals.values.empty()) {
             res.status = 404;
@@ -226,7 +226,7 @@ void HTTPServer::handleDistance(const httplib::Request& req,
         long timestamp = getCurrentTimestamp();
 
         value_t distances =
-            MovingAverage::getRecentDistance(symbol, timestamp, window);
+            DataCollector::getRecentDistance(symbol, timestamp, window);
 
         if (distances.values.empty()) {
             res.status = 404;

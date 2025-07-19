@@ -9,7 +9,7 @@
 #include <iostream>
 
 #include "../measurement/measurement.hpp"
-#include "../moving_average/moving_average.hpp"
+#include "../data_collector/data_collector.hpp"
 #include "../pearson/pearson.hpp"
 #include "../utils/cpu_stats.hpp"
 
@@ -51,7 +51,7 @@ void Scheduler::start(scheduler_t& scheduler) {
         active_scheduler = &scheduler;
 
         pthread_create(&scheduler.threadAverage, nullptr,
-                       MovingAverage::workerThread, &scheduler);
+                       DataCollector::workerThread, &scheduler);
         pthread_create(&scheduler.threadPearson, nullptr, Pearson::workerThread,
                        &scheduler);
         pthread_create(&scheduler.threadScheduler, nullptr,
@@ -101,7 +101,7 @@ void Scheduler::run(scheduler_t& scheduler) {
         scheduler.currentTimestamp = nextMinuteTimestampInMs;
 
         Measurement::cleanupOldMeasurements(scheduler.currentTimestamp);
-        MovingAverage::cleanupOldAverages(scheduler.currentTimestamp);
+        DataCollector::cleanupOldAverages(scheduler.currentTimestamp);
 
         // Calculate and write CPU stats
         double cpuIdlePercentage = CpuStats::getCpuIdlePercentage();

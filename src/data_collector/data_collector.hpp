@@ -15,35 +15,16 @@ struct calculateAverageArgs {
 };
 
 typedef struct {
-    std::string symbol;
-    double average;
+    double data;
     long timestamp;
-} average_t;
-
-typedef struct {
-    std::string symbol;
-    double macd;
-    long timestamp;
-} macd_t;
-
-typedef struct {
-    std::string symbol;
-    double signal;
-    long timestamp;
-} signal_t;
-
-typedef struct {
-    std::string symbol;
-    double distance;
-    long timestamp;
-} distance_t;
+} dataPoint_t;
 
 typedef struct {
     std::vector<double> values;
     std::vector<long> timestamps;
 } value_t;
 
-namespace MovingAverage {
+namespace DataCollector {
 
 extern const long MA_WINDOW;
 extern const long EMA_WINDOW;
@@ -51,15 +32,16 @@ extern const long SIGNAL_WINDOW;
 extern const long AVERAGE_HISTORY_MS;
 extern const long SHORT_TERM_EMA_WINDOW;
 extern const long LONG_TERM_EMA_WINDOW;
-extern std::map<std::string, std::deque<average_t>> latestAverages;
-extern std::map<std::string, std::deque<average_t>> latestExponentialAverages;
-extern std::map<std::string, std::deque<average_t>>
+extern std::map<std::string, std::deque<dataPoint_t>> latestAverages;
+extern std::map<std::string, std::deque<dataPoint_t>> latestExponentialAverages;
+extern std::map<std::string, std::deque<dataPoint_t>>
     latestShortTermEMA;  // 15 minutes
-extern std::map<std::string, std::deque<average_t>>
+extern std::map<std::string, std::deque<dataPoint_t>>
     latestLongTermEMA;  // 30 minutes
-extern std::map<std::string, std::deque<macd_t>> latestMACD;
-extern std::map<std::string, std::deque<signal_t>> latestSignal;
-extern std::map<std::string, std::deque<distance_t>> latestDistance;
+extern std::map<std::string, std::deque<dataPoint_t>> latestMACD;
+extern std::map<std::string, std::deque<dataPoint_t>> latestSignal;
+extern std::map<std::string, std::deque<dataPoint_t>> latestDistance;
+extern std::map<std::string, std::deque<dataPoint_t>> latestClosingPrices;
 extern pthread_mutex_t averagesMutex;
 
 void storeAverage(std::string symbol, double average, long timestamp, int delay,
@@ -76,6 +58,8 @@ void* calculateSignal(std::vector<std::string> symbols, long currentTimestamp,
                       long window);
 void* calculateDistance(std::vector<std::string> symbols,
                         long currentTimestamp);
+void* calculateClosingPrice(std::vector<std::string> symbols,
+                            long currentTimestamp);
 void* workerThread(void* arg);
 value_t getRecentAverages(const std::string& symbol, long timestamp,
                           size_t window = 0);
@@ -87,5 +71,7 @@ value_t getRecentSignal(const std::string& symbol, long timestamp,
                         size_t window = 0);
 value_t getRecentDistance(const std::string& symbol, long timestamp,
                           size_t window = 0);
+value_t getRecentClosingPrices(const std::string& symbol, long timestamp,
+                               size_t window = 0);
 
-}  // namespace MovingAverage
+}  // namespace DataCollector

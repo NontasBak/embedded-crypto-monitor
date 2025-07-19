@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <iostream>
 
-#include "../moving_average/moving_average.hpp"
+#include "../data_collector/data_collector.hpp"
 #include "../scheduler/scheduler.hpp"
 
 void Pearson::writePearsonToFile(std::string symbol1, std::string symbol2,
@@ -93,7 +93,7 @@ void* Pearson::calculateAllPearson(void* arg) {
 
     for (const auto& symbol1 : SYMBOLS) {
         std::vector<double> averages1 =
-            MovingAverage::getRecentAverages(symbol1, currentTimestamp,
+            DataCollector::getRecentAverages(symbol1, currentTimestamp,
                                              PEARSON_WINDOW)
                 .values;
 
@@ -107,7 +107,7 @@ void* Pearson::calculateAllPearson(void* arg) {
 
         for (const auto& symbol2 : SYMBOLS) {
             std::vector<double> averages2 =
-                MovingAverage::getRecentAverages(symbol2, currentTimestamp)
+                DataCollector::getRecentAverages(symbol2, currentTimestamp)
                     .values;
 
             const size_t n = averages2.size();

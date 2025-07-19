@@ -1,5 +1,3 @@
-#include "moving_average.hpp"
-
 #include <pthread.h>
 
 #include <chrono>
@@ -7,133 +5,29 @@
 
 #include "../measurement/measurement.hpp"
 #include "../scheduler/scheduler.hpp"
+#include "data_collector.hpp"
 
-const long MovingAverage::MA_WINDOW = 15 * 60 * 1000;   // 15 minutes
-const long MovingAverage::EMA_WINDOW = 28 * 60 * 1000;  // 26 minutes
-const long MovingAverage::AVERAGE_HISTORY_MS =
+const long DataCollector::MA_WINDOW = 15 * 60 * 1000;   // 15 minutes
+const long DataCollector::EMA_WINDOW = 28 * 60 * 1000;  // 26 minutes
+const long DataCollector::AVERAGE_HISTORY_MS =
     60 * 60 * 1000;  // 60 minutes, for pearson
-const long MovingAverage::SHORT_TERM_EMA_WINDOW = 12 * 60 * 1000;  // 12 minutes
-const long MovingAverage::LONG_TERM_EMA_WINDOW = 26 * 60 * 1000;   // 26 minutes
-const long MovingAverage::SIGNAL_WINDOW = 9 * 60 * 1000;           // 9 minutes
-std::map<std::string, std::deque<average_t>> MovingAverage::latestAverages;
-std::map<std::string, std::deque<average_t>>
-    MovingAverage::latestExponentialAverages;
-std::map<std::string, std::deque<average_t>> MovingAverage::latestShortTermEMA;
-std::map<std::string, std::deque<average_t>> MovingAverage::latestLongTermEMA;
-std::map<std::string, std::deque<macd_t>> MovingAverage::latestMACD;
-std::map<std::string, std::deque<signal_t>> MovingAverage::latestSignal;
-std::map<std::string, std::deque<distance_t>> MovingAverage::latestDistance;
-pthread_mutex_t MovingAverage::averagesMutex;
+const long DataCollector::SHORT_TERM_EMA_WINDOW = 12 * 60 * 1000;  // 12 minutes
+const long DataCollector::LONG_TERM_EMA_WINDOW = 26 * 60 * 1000;   // 26 minutes
+const long DataCollector::SIGNAL_WINDOW = 9 * 60 * 1000;           // 9 minutes
+std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestAverages;
+std::map<std::string, std::deque<dataPoint_t>>
+    DataCollector::latestExponentialAverages;
+std::map<std::string, std::deque<dataPoint_t>>
+    DataCollector::latestShortTermEMA;
+std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestLongTermEMA;
+std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestMACD;
+std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestSignal;
+std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestDistance;
+std::map<std::string, std::deque<dataPoint_t>>
+    DataCollector::latestClosingPrices;
+pthread_mutex_t DataCollector::averagesMutex;
 
-void MovingAverage::cleanupOldAverages(long currentTimestamp) {
-    for (auto& pair : latestAverages) {
-        std::deque<average_t>& symbolAverages = pair.second;
-        while (!symbolAverages.empty() &&
-               (currentTimestamp - symbolAverages.front().timestamp >
-                AVERAGE_HISTORY_MS)) {
-            symbolAverages.pop_front();
-        }
-    }
-}
-
-// void MovingAverage::cleanupOldData(long currentTimestamp) {
-//     // Short-term EMA data
-//     for (auto& pair : latestShortTermEMA) {
-//         std::deque<average_t>& shortTermEMA = pair.second;
-//         while (!shortTermEMA.empty() &&
-//                (currentTimestamp - shortTermEMA.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             shortTermEMA.pop_front();
-//         }
-//     }
-
-//     // long-term EMA data
-//     for (auto& pair : latestLongTermEMA) {
-//         std::deque<average_t>& longTermEMA = pair.second;
-//         while (!longTermEMA.empty() &&
-//                (currentTimestamp - longTermEMA.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             longTermEMA.pop_front();
-//         }
-//     }
-
-//     // MACD data
-//     for (auto& pair : latestMACD) {
-//         std::deque<macd_t>& macdData = pair.second;
-//         while (!macdData.empty() &&
-//                (currentTimestamp - macdData.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             macdData.pop_front();
-//         }
-//     }
-
-//     // signal data
-//     for (auto& pair : latestSignal) {
-//         std::deque<signal_t>& signalData = pair.second;
-//         while (!signalData.empty() &&
-//                (currentTimestamp - signalData.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             signalData.pop_front();
-//         }
-//     }
-
-//     // distance data
-//     for (auto& pair : latestDistance) {
-//         std::deque<distance_t>& distanceData = pair.second;
-//         while (!distanceData.empty() &&
-//                (currentTimestamp - distanceData.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             distanceData.pop_front();
-//         }
-//     }
-// }
-
-value_t MovingAverage::getRecentAverages(const std::string& symbol,
-                                         long timestamp, size_t window) {
-    pthread_mutex_lock(&averagesMutex);
-
-    value_t result;
-    const std::deque<average_t>& averages = latestAverages[symbol];
-
-    size_t startPos =
-        averages.size() > window && window > 0 ? averages.size() - window : 0;
-    for (size_t i = startPos; i < averages.size(); i++) {
-        result.values.push_back(averages.at(i).average);
-        result.timestamps.push_back(averages.at(i).timestamp);
-    }
-    pthread_mutex_unlock(&averagesMutex);
-
-    return result;
-}
-
-value_t MovingAverage::getRecentEMA(const std::string& symbol, long timestamp,
-                                    size_t window, std::string type) {
-    pthread_mutex_lock(&averagesMutex);
-
-    value_t result;
-    const std::deque<average_t>* averages;
-    if (type == "short") {
-        averages = &latestShortTermEMA[symbol];
-    } else if (type == "long") {
-        averages = &latestLongTermEMA[symbol];
-    } else {
-        std::cerr << "Invalid type: " << type << std::endl;
-        pthread_mutex_unlock(&averagesMutex);
-        return result;
-    }
-
-    size_t startPos =
-        averages->size() > window && window > 0 ? averages->size() - window : 0;
-    for (size_t i = startPos; i < averages->size(); i++) {
-        result.values.push_back(averages->at(i).average);
-        result.timestamps.push_back(averages->at(i).timestamp);
-    }
-    pthread_mutex_unlock(&averagesMutex);
-
-    return result;
-}
-
-void* MovingAverage::workerThread(void* arg) {
+void* DataCollector::workerThread(void* arg) {
     scheduler_t* scheduler = (scheduler_t*)arg;
     std::vector<std::string> symbols = scheduler->SYMBOLS;
 
@@ -159,6 +53,7 @@ void* MovingAverage::workerThread(void* arg) {
         calculateMACD(symbols, timestamp);
         calculateSignal(symbols, timestamp, SIGNAL_WINDOW);
         calculateDistance(symbols, timestamp);
+        calculateClosingPrice(symbols, timestamp);
 
         // for (const std::string& symbol : symbols) {
         //     cleanupOldAverages(symbol, timestamp);
@@ -169,7 +64,7 @@ void* MovingAverage::workerThread(void* arg) {
     return nullptr;
 }
 
-void* MovingAverage::calculateAverage(std::vector<std::string> symbols,
+void* DataCollector::calculateAverage(std::vector<std::string> symbols,
                                       long currentTimestamp) {
     for (const std::string& symbol : symbols) {
         std::vector<measurement_t> measurementsForSymbol =
@@ -193,7 +88,7 @@ void* MovingAverage::calculateAverage(std::vector<std::string> symbols,
                              .count();
         int delay = timestamp - currentTimestamp;
 
-        MovingAverage::storeAverage(symbol, average, currentTimestamp, delay,
+        DataCollector::storeAverage(symbol, average, currentTimestamp, delay,
                                     "simple");
 
         std::cout << "Moving average for " << symbol << ": " << average
@@ -203,7 +98,7 @@ void* MovingAverage::calculateAverage(std::vector<std::string> symbols,
     return nullptr;
 }
 
-void* MovingAverage::calculateAllExponentialAverages(
+void* DataCollector::calculateAllExponentialAverages(
     std::vector<std::string> symbols, long currentTimestamp) {
     for (const std::string& symbol : symbols) {
         std::vector<measurement_t> measurementsForSymbolShortTerm =
@@ -217,10 +112,10 @@ void* MovingAverage::calculateAllExponentialAverages(
         double previousEMAShortTerm = 0;
         double previousEMALongTerm = 0;
         if (!latestShortTermEMA[symbol].empty()) {
-            previousEMAShortTerm = latestShortTermEMA[symbol].back().average;
+            previousEMAShortTerm = latestShortTermEMA[symbol].back().data;
         }
         if (!latestLongTermEMA[symbol].empty()) {
-            previousEMALongTerm = latestLongTermEMA[symbol].back().average;
+            previousEMALongTerm = latestLongTermEMA[symbol].back().data;
         }
         pthread_mutex_unlock(&averagesMutex);
 
@@ -231,15 +126,13 @@ void* MovingAverage::calculateAllExponentialAverages(
             measurementsForSymbolLongTerm, previousEMALongTerm,
             LONG_TERM_EMA_WINDOW);
 
-        average_t shortTermAverage = {
-            .symbol = symbol,
-            .average = exponentialAverageShortTerm,
+        dataPoint_t shortTermAverage = {
+            .data = exponentialAverageShortTerm,
             .timestamp = currentTimestamp,
         };
 
-        average_t longTermAverage = {
-            .symbol = symbol,
-            .average = exponentialAverageLongTerm,
+        dataPoint_t longTermAverage = {
+            .data = exponentialAverageLongTerm,
             .timestamp = currentTimestamp,
         };
 
@@ -255,10 +148,10 @@ void* MovingAverage::calculateAllExponentialAverages(
         //                      .count();
         // int delay = timestamp - currentTimestamp;
 
-        // MovingAverage::storeAverage(symbol, exponentialAverageShortTerm,
+        // DataCollector::storeAverage(symbol, exponentialAverageShortTerm,
         //                             currentTimestamp, delay,
         //                             "exponential");
-        // MovingAverage::storeAverage(symbol, exponentialAverageLongTerm,
+        // DataCollector::storeAverage(symbol, exponentialAverageLongTerm,
         //                             currentTimestamp, delay,
         //                             "exponential");
 
@@ -271,7 +164,7 @@ void* MovingAverage::calculateAllExponentialAverages(
     return nullptr;
 }
 
-double MovingAverage::calculateExponentialAverage(
+double DataCollector::calculateExponentialAverage(
     std::vector<measurement_t> measurements, const double previousEMA,
     long window) {
     const int n = window / (6 * 10000);
@@ -302,7 +195,7 @@ double MovingAverage::calculateExponentialAverage(
     return exponentialAverage;
 }
 
-void* MovingAverage::calculateMACD(std::vector<std::string> symbols,
+void* DataCollector::calculateMACD(std::vector<std::string> symbols,
                                    long currentTimestamp) {
     for (const std::string& symbol : symbols) {
         pthread_mutex_lock(&averagesMutex);
@@ -311,11 +204,11 @@ void* MovingAverage::calculateMACD(std::vector<std::string> symbols,
         double longTermEMA = 0;
 
         if (!latestShortTermEMA[symbol].empty()) {
-            shortTermEMA = latestShortTermEMA[symbol].back().average;
+            shortTermEMA = latestShortTermEMA[symbol].back().data;
         }
 
         if (!latestLongTermEMA[symbol].empty()) {
-            longTermEMA = latestLongTermEMA[symbol].back().average;
+            longTermEMA = latestLongTermEMA[symbol].back().data;
         }
 
         pthread_mutex_unlock(&averagesMutex);
@@ -323,10 +216,8 @@ void* MovingAverage::calculateMACD(std::vector<std::string> symbols,
         if (shortTermEMA != 0 && longTermEMA != 0) {
             double macdValue = shortTermEMA - longTermEMA;
 
-            macd_t macd;
-            macd.symbol = symbol;
-            macd.macd = macdValue;
-            macd.timestamp = currentTimestamp;
+            dataPoint_t macd = {.data = macdValue,
+                                .timestamp = currentTimestamp};
 
             pthread_mutex_lock(&averagesMutex);
             latestMACD[symbol].push_back(macd);
@@ -340,7 +231,7 @@ void* MovingAverage::calculateMACD(std::vector<std::string> symbols,
     return nullptr;
 }
 
-void* MovingAverage::calculateSignal(std::vector<std::string> symbols,
+void* DataCollector::calculateSignal(std::vector<std::string> symbols,
                                      long currentTimestamp, long window) {
     const int n = window / (6 * 10000);
     const double alpha = 2.0 / (n + 1);
@@ -350,12 +241,12 @@ void* MovingAverage::calculateSignal(std::vector<std::string> symbols,
 
         double currentMACD = 0;
         if (!latestMACD[symbol].empty()) {
-            currentMACD = latestMACD[symbol].back().macd;
+            currentMACD = latestMACD[symbol].back().data;
         }
 
         double previousSignal = 0;
         if (!latestSignal[symbol].empty()) {
-            previousSignal = latestSignal[symbol].back().signal;
+            previousSignal = latestSignal[symbol].back().data;
         }
 
         pthread_mutex_unlock(&averagesMutex);
@@ -369,10 +260,8 @@ void* MovingAverage::calculateSignal(std::vector<std::string> symbols,
                     (currentMACD - previousSignal) * alpha + previousSignal;
             }
 
-            signal_t signal;
-            signal.symbol = symbol;
-            signal.signal = signalValue;
-            signal.timestamp = currentTimestamp;
+            dataPoint_t signal = {.data = signalValue,
+                                  .timestamp = currentTimestamp};
 
             pthread_mutex_lock(&averagesMutex);
             latestSignal[symbol].push_back(signal);
@@ -386,7 +275,7 @@ void* MovingAverage::calculateSignal(std::vector<std::string> symbols,
     return nullptr;
 }
 
-void* MovingAverage::calculateDistance(std::vector<std::string> symbols,
+void* DataCollector::calculateDistance(std::vector<std::string> symbols,
                                        long currentTimestamp) {
     for (const std::string& symbol : symbols) {
         pthread_mutex_lock(&averagesMutex);
@@ -395,11 +284,11 @@ void* MovingAverage::calculateDistance(std::vector<std::string> symbols,
         double currentSignal = 0;
 
         if (!latestMACD[symbol].empty()) {
-            currentMACD = latestMACD[symbol].back().macd;
+            currentMACD = latestMACD[symbol].back().data;
         }
 
         if (!latestSignal[symbol].empty()) {
-            currentSignal = latestSignal[symbol].back().signal;
+            currentSignal = latestSignal[symbol].back().data;
         }
 
         pthread_mutex_unlock(&averagesMutex);
@@ -407,10 +296,8 @@ void* MovingAverage::calculateDistance(std::vector<std::string> symbols,
         if (currentMACD != 0 && currentSignal != 0) {
             double distanceValue = currentMACD - currentSignal;
 
-            distance_t distance;
-            distance.symbol = symbol;
-            distance.distance = distanceValue;
-            distance.timestamp = currentTimestamp;
+            dataPoint_t distance = {.data = distanceValue,
+                                    .timestamp = currentTimestamp};
 
             pthread_mutex_lock(&averagesMutex);
             latestDistance[symbol].push_back(distance);
@@ -424,12 +311,36 @@ void* MovingAverage::calculateDistance(std::vector<std::string> symbols,
     return nullptr;
 }
 
-void MovingAverage::storeAverage(std::string symbol, double average,
+void* DataCollector::calculateClosingPrice(std::vector<std::string> symbols,
+                                           long currentTimestamp) {
+    for (const std::string& symbol : symbols) {
+        std::vector<measurement_t> measurementsForSymbol =
+            Measurement::getRecentMeasurements(symbol, 60 * 1000,
+                                               currentTimestamp);
+
+        if (!measurementsForSymbol.empty()) {
+            // Get the most recent measurement as the closing price
+            measurement_t latestMeasurement = measurementsForSymbol.back();
+            double closingPrice = latestMeasurement.px;
+
+            dataPoint_t closingPricePoint = {.data = closingPrice,
+                                             .timestamp = currentTimestamp};
+
+            pthread_mutex_lock(&averagesMutex);
+            latestClosingPrices[symbol].push_back(closingPricePoint);
+            pthread_mutex_unlock(&averagesMutex);
+
+            std::cout << "Closing price for " << symbol << ": " << closingPrice
+                      << std::endl;
+        }
+    }
+
+    return nullptr;
+}
+
+void DataCollector::storeAverage(std::string symbol, double average,
                                  long timestamp, int delay, std::string type) {
-    average_t avg;
-    avg.symbol = symbol;
-    avg.average = average;
-    avg.timestamp = timestamp;
+    dataPoint_t avg = {.data = average, .timestamp = timestamp};
 
     pthread_mutex_lock(&averagesMutex);
 
@@ -453,17 +364,62 @@ void MovingAverage::storeAverage(std::string symbol, double average,
     fclose(fp);
 };
 
-value_t MovingAverage::getRecentMACD(const std::string& symbol, long timestamp,
+value_t DataCollector::getRecentEMA(const std::string& symbol, long timestamp,
+                                    size_t window, std::string type) {
+    pthread_mutex_lock(&averagesMutex);
+
+    value_t result;
+    const std::deque<dataPoint_t>* averages;
+    if (type == "short") {
+        averages = &latestShortTermEMA[symbol];
+    } else if (type == "long") {
+        averages = &latestLongTermEMA[symbol];
+    } else {
+        std::cerr << "Invalid type: " << type << std::endl;
+        pthread_mutex_unlock(&averagesMutex);
+        return result;
+    }
+
+    size_t startPos =
+        averages->size() > window && window > 0 ? averages->size() - window : 0;
+    for (size_t i = startPos; i < averages->size(); i++) {
+        result.values.push_back(averages->at(i).data);
+        result.timestamps.push_back(averages->at(i).timestamp);
+    }
+    pthread_mutex_unlock(&averagesMutex);
+
+    return result;
+}
+
+value_t DataCollector::getRecentAverages(const std::string& symbol,
+                                         long timestamp, size_t window) {
+    pthread_mutex_lock(&averagesMutex);
+
+    value_t result;
+    const std::deque<dataPoint_t>& averages = latestAverages[symbol];
+
+    size_t startPos =
+        averages.size() > window && window > 0 ? averages.size() - window : 0;
+    for (size_t i = startPos; i < averages.size(); i++) {
+        result.values.push_back(averages.at(i).data);
+        result.timestamps.push_back(averages.at(i).timestamp);
+    }
+    pthread_mutex_unlock(&averagesMutex);
+
+    return result;
+}
+
+value_t DataCollector::getRecentMACD(const std::string& symbol, long timestamp,
                                      size_t window) {
     pthread_mutex_lock(&averagesMutex);
     value_t result;
-    const std::deque<macd_t>& macdData = latestMACD[symbol];
+    const std::deque<dataPoint_t>& macdData = latestMACD[symbol];
 
     size_t startPos =
         macdData.size() > window && window > 0 ? macdData.size() - window : 0;
 
     for (size_t i = startPos; i < macdData.size(); i++) {
-        result.values.push_back(macdData.at(i).macd);
+        result.values.push_back(macdData.at(i).data);
         result.timestamps.push_back(macdData.at(i).timestamp);
     }
     pthread_mutex_unlock(&averagesMutex);
@@ -471,18 +427,18 @@ value_t MovingAverage::getRecentMACD(const std::string& symbol, long timestamp,
     return result;
 }
 
-value_t MovingAverage::getRecentSignal(const std::string& symbol,
+value_t DataCollector::getRecentSignal(const std::string& symbol,
                                        long timestamp, size_t window) {
     pthread_mutex_lock(&averagesMutex);
 
     value_t result;
-    const std::deque<signal_t>& signalData = latestSignal[symbol];
+    const std::deque<dataPoint_t>& signalData = latestSignal[symbol];
 
     size_t startPos = signalData.size() > window && window > 0
                           ? signalData.size() - window
                           : 0;
     for (size_t i = startPos; i < signalData.size(); i++) {
-        result.values.push_back(signalData.at(i).signal);
+        result.values.push_back(signalData.at(i).data);
         result.timestamps.push_back(signalData.at(i).timestamp);
     }
     pthread_mutex_unlock(&averagesMutex);
@@ -490,21 +446,104 @@ value_t MovingAverage::getRecentSignal(const std::string& symbol,
     return result;
 }
 
-value_t MovingAverage::getRecentDistance(const std::string& symbol,
+value_t DataCollector::getRecentDistance(const std::string& symbol,
                                          long timestamp, size_t window) {
     pthread_mutex_lock(&averagesMutex);
 
     value_t result;
-    const std::deque<distance_t>& distanceData = latestDistance[symbol];
+    const std::deque<dataPoint_t>& distanceData = latestDistance[symbol];
 
     size_t startPos = distanceData.size() > window && window > 0
                           ? distanceData.size() - window
                           : 0;
     for (size_t i = startPos; i < distanceData.size(); i++) {
-        result.values.push_back(distanceData.at(i).distance);
+        result.values.push_back(distanceData.at(i).data);
         result.timestamps.push_back(distanceData.at(i).timestamp);
     }
     pthread_mutex_unlock(&averagesMutex);
 
     return result;
 }
+
+value_t DataCollector::getRecentClosingPrices(const std::string& symbol,
+                                              long timestamp, size_t window) {
+    pthread_mutex_lock(&averagesMutex);
+
+    value_t result;
+    const std::deque<dataPoint_t>& closingPriceData =
+        latestClosingPrices[symbol];
+
+    size_t startPos = closingPriceData.size() > window && window > 0
+                          ? closingPriceData.size() - window
+                          : 0;
+    for (size_t i = startPos; i < closingPriceData.size(); i++) {
+        result.values.push_back(closingPriceData.at(i).data);
+        result.timestamps.push_back(closingPriceData.at(i).timestamp);
+    }
+    pthread_mutex_unlock(&averagesMutex);
+
+    return result;
+}
+
+void DataCollector::cleanupOldAverages(long currentTimestamp) {
+    for (auto& pair : latestAverages) {
+        std::deque<dataPoint_t>& symbolAverages = pair.second;
+        while (!symbolAverages.empty() &&
+               (currentTimestamp - symbolAverages.front().timestamp >
+                AVERAGE_HISTORY_MS)) {
+            symbolAverages.pop_front();
+        }
+    }
+}
+
+// void DataCollector::cleanupOldData(long currentTimestamp) {
+//     // Short-term EMA data
+//     for (auto& pair : latestShortTermEMA) {
+//         std::deque<dataPoint_t>& shortTermEMA = pair.second;
+//         while (!shortTermEMA.empty() &&
+//                (currentTimestamp - shortTermEMA.front().timestamp >
+//                 AVERAGE_HISTORY_MS)) {
+//             shortTermEMA.pop_front();
+//         }
+//     }
+
+//     // long-term EMA data
+//     for (auto& pair : latestLongTermEMA) {
+//         std::deque<dataPoint_t>& longTermEMA = pair.second;
+//         while (!longTermEMA.empty() &&
+//                (currentTimestamp - longTermEMA.front().timestamp >
+//                 AVERAGE_HISTORY_MS)) {
+//             longTermEMA.pop_front();
+//         }
+//     }
+
+//     // MACD data
+//     for (auto& pair : latestMACD) {
+//         std::deque<dataPoint_t>& macdData = pair.second;
+//         while (!macdData.empty() &&
+//                (currentTimestamp - macdData.front().timestamp >
+//                 AVERAGE_HISTORY_MS)) {
+//             macdData.pop_front();
+//         }
+//     }
+
+//     // signal data
+//     for (auto& pair : latestSignal) {
+//         std::deque<dataPoint_t>& signalData = pair.second;
+//         while (!signalData.empty() &&
+//                (currentTimestamp - signalData.front().timestamp >
+//                 AVERAGE_HISTORY_MS)) {
+//             signalData.pop_front();
+//         }
+//     }
+
+//     // distance data
+//     for (auto& pair : latestDistance) {
+//         std::deque<dataPoint_t>& distanceData = pair.second;
+//         while (!distanceData.empty() &&
+//                (currentTimestamp - distanceData.front().timestamp >
+//                 AVERAGE_HISTORY_MS)) {
+//             distanceData.pop_front();
+//         }
+//     }
+// }

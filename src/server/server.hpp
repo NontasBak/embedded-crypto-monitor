@@ -6,7 +6,7 @@
 #include <string>
 #include <thread>
 
-#include "../moving_average/moving_average.hpp"
+#include "../data_collector/data_collector.hpp"
 
 class HTTPServer {
    public:

@@ -17,7 +17,7 @@ SOURCES = src/main.cpp \
           src/utils/setup.cpp \
           src/utils/cpu_stats.cpp \
           src/measurement/measurement.cpp \
-          src/moving_average/moving_average.cpp \
+          src/data_collector/data_collector.cpp \
           src/pearson/pearson.cpp \
           src/server/server.cpp
 
