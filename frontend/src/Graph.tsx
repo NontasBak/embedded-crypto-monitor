@@ -265,6 +265,78 @@ function Graph({
 
     const chartConfig = createChartConfig();
 
+    const formatYAxisTick = (value: number): string => {
+        if (typeof value !== "number" || !isFinite(value)) return "0";
+
+        const absValue = Math.abs(value);
+
+        if (absValue > 0 && absValue < 0.001) {
+            return value.toExponential(2);
+        }
+
+        if (absValue >= 1000000) {
+            return value.toExponential(2);
+        }
+
+        if (absValue >= 1000) {
+            return value.toFixed(1);
+        } else if (absValue >= 1) {
+            return value.toFixed(2);
+        } else {
+            return value.toFixed(4);
+        }
+    };
+
+    const formatTooltipValue = (value: number): string => {
+        if (typeof value !== "number" || !isFinite(value)) return "0";
+
+        const absValue = Math.abs(value);
+
+        if (absValue > 0 && absValue < 0.001) {
+            return value.toExponential(3);
+        }
+
+        if (absValue >= 1000000) {
+            return value.toExponential(3);
+        }
+
+        if (absValue >= 1000) {
+            return value.toFixed(2);
+        } else if (absValue >= 1) {
+            return value.toFixed(4);
+        } else {
+            return value.toFixed(6);
+        }
+    };
+
+    // Custom formatter that preserves the default tooltip appearance
+    const customTooltipFormatter = (value: any, name: any, item: any) => {
+        const formattedValue = formatTooltipValue(Number(value));
+        const indicatorColor =
+            item?.payload?.fill ||
+            item?.color ||
+            indicatorColors[name as IndicatorType];
+
+        return (
+            <>
+                <div
+                    className="shrink-0 rounded-[2px] h-2.5 w-2.5"
+                    style={{
+                        backgroundColor: indicatorColor,
+                    }}
+                />
+                <div className="flex flex-1 justify-between leading-none items-center">
+                    <span className="text-muted-foreground">
+                        {indicatorLabels[name as IndicatorType] || name}
+                    </span>
+                    <span className="text-foreground font-mono font-medium tabular-nums">
+                        {formattedValue}
+                    </span>
+                </div>
+            </>
+        );
+    };
+
     return (
         <Card className="w-full">
             <CardHeader>
@@ -307,11 +379,12 @@ function Graph({
                                 minTickGap={32}
                             />
                             <YAxis
-                                width={50}
+                                width={60}
                                 tickLine={false}
                                 axisLine={false}
-                                tickMargin={0}
+                                tickMargin={8}
                                 domain={yAxisDomain}
+                                tickFormatter={formatYAxisTick}
                             />
                             <ChartTooltip
                                 content={
@@ -328,6 +401,7 @@ function Graph({
                                                   ).toLocaleString()
                                                 : value;
                                         }}
+                                        formatter={customTooltipFormatter}
                                     />
                                 }
                             />
