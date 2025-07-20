@@ -104,7 +104,7 @@ function Graph({
         indicator: IndicatorType,
         window: string,
     ): Promise<{ data: { values: number[]; timestamps: number[] } }> {
-        const baseUrl = "http://157.230.120.34:8080";
+        const baseUrl = "https://api-crypto-monitor.nontasbak.com";
         let url = "";
 
         switch (indicator) {

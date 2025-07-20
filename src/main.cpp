@@ -43,7 +43,7 @@ int main() {
 
     OkxClient::waitForSubscriptions(client);
 
-    HTTPServer server(8080);
+    HTTPServer server(80);
     server.start();
 
     Scheduler::start(*scheduler);
