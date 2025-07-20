@@ -9,21 +9,6 @@ function WindowSelector({
     selectedWindow,
     onWindowChange,
 }: WindowSelectorProps) {
-    const getWindowLabel = (window: string) => {
-        switch (window) {
-            case "360":
-                return "6 hours";
-            case "720":
-                return "12 hours";
-            case "1440":
-                return "1 day";
-            case "4320":
-                return "3 days";
-            default:
-                return `${window} minutes`;
-        }
-    };
-
     return (
         <div className="flex items-center gap-2">
             <h3 className="text-sm font-medium text-muted-foreground">
