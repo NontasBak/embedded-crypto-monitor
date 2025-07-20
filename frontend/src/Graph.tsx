@@ -89,9 +89,11 @@ const signalLabels = {
 function Graph({
     selectedSymbol,
     indicators = ["close"] as IndicatorType[],
+    selectedWindow,
 }: {
     selectedSymbol: string;
     indicators?: IndicatorType[];
+    selectedWindow: string;
 }) {
     const [cryptoData, setCryptoData] = useState<CryptoData>(
         initializeData(indicators),
@@ -100,19 +102,20 @@ function Graph({
     async function fetchData(
         symbol: string,
         indicator: IndicatorType,
+        window: string,
     ): Promise<{ data: { values: number[]; timestamps: number[] } }> {
         const baseUrl = "http://157.230.120.34:8080";
         let url = "";
 
         switch (indicator) {
             case "ema_short":
-                url = `${baseUrl}/ema?symbol=${symbol}&window=100&type=short`;
+                url = `${baseUrl}/ema?symbol=${symbol}&window=${window}&type=short`;
                 break;
             case "ema_long":
-                url = `${baseUrl}/ema?symbol=${symbol}&window=100&type=long`;
+                url = `${baseUrl}/ema?symbol=${symbol}&window=${window}&type=long`;
                 break;
             default:
-                url = `${baseUrl}/${indicator}?symbol=${symbol}&window=100`;
+                url = `${baseUrl}/${indicator}?symbol=${symbol}&window=${window}`;
                 break;
         }
 
@@ -277,6 +280,7 @@ function Graph({
                         const indicatorData = await fetchData(
                             selectedSymbol,
                             indicator,
+                            selectedWindow,
                         );
 
                         return {
@@ -310,10 +314,10 @@ function Graph({
             }
         };
 
-        // Reset data when symbol or indicators change
+        // Reset data when symbol, indicators, or window change
         setCryptoData(initializeData(indicators));
         fetchAllData();
-    }, [selectedSymbol, indicators]);
+    }, [selectedSymbol, indicators, selectedWindow]);
 
     // Log chart data changes
     // useEffect(() => {
@@ -409,8 +413,7 @@ function Graph({
             <CardHeader>
                 <CardTitle>Crypto Analysis Chart</CardTitle>
                 <CardDescription>
-                    Showing {indicators.join(", ")} for {selectedSymbol} (last{" "}
-                    {chartData.length} minutes)
+                    Showing {indicators.join(", ")} for {selectedSymbol}
                 </CardDescription>
             </CardHeader>
             <CardContent>
