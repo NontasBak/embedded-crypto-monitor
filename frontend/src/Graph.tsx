@@ -90,10 +90,14 @@ function Graph({
     selectedSymbol,
     indicators = ["close"] as IndicatorType[],
     selectedWindow,
+    title,
+    description,
 }: {
     selectedSymbol: string;
     indicators?: IndicatorType[];
     selectedWindow: string;
+    title: string;
+    description: string;
 }) {
     const [cryptoData, setCryptoData] = useState<CryptoData>(
         initializeData(indicators),
@@ -411,10 +415,8 @@ function Graph({
     return (
         <Card className="w-full">
             <CardHeader>
-                <CardTitle>Crypto Analysis Chart</CardTitle>
-                <CardDescription>
-                    Showing {indicators.join(", ")} for {selectedSymbol}
-                </CardDescription>
+                <CardTitle>{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
             </CardHeader>
             <CardContent>
                 {chartData.length === 0 ? (
