@@ -40,4 +40,5 @@ class HTTPServer {
     long getCurrentTimestamp();
     bool validateParameters(const httplib::Request& req,
                             const std::vector<std::string>& required_params);
+    value_t filterDataPoints(const value_t& data, size_t maxPoints = 200);
 };

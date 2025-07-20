@@ -8,8 +8,8 @@
 #include <cmath>
 #include <iostream>
 
-#include "../measurement/measurement.hpp"
 #include "../data_collector/data_collector.hpp"
+#include "../measurement/measurement.hpp"
 #include "../pearson/pearson.hpp"
 #include "../utils/cpu_stats.hpp"
 
@@ -102,6 +102,7 @@ void Scheduler::run(scheduler_t& scheduler) {
 
         Measurement::cleanupOldMeasurements(scheduler.currentTimestamp);
         DataCollector::cleanupOldAverages(scheduler.currentTimestamp);
+        DataCollector::cleanupOldData(scheduler.currentTimestamp);
 
         // Calculate and write CPU stats
         double cpuIdlePercentage = CpuStats::getCpuIdlePercentage();

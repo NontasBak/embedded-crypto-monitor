@@ -1,40 +1,11 @@
-/**
- * Graph Component - Multi-line Chart for Cryptocurrency Analysis
- *
- * Usage Examples:
- *
- * // Display single indicator (distance)
- * <Graph selectedSymbol="BTCUSDT" />
- *
- * // Display multiple indicators
- * <Graph
- *   selectedSymbol="BTCUSDT"
- *   indicators={["sma", "ema_short", "ema_long", "macd"]}
- * />
- *
- * // Display close price with technical indicators
- * <Graph
- *   selectedSymbol="ETHUSDT"
- *   indicators={["close", "sma", "macd", "signal"]}
- * />
- *
- * Available indicators:
- * - "close": Closing price
- * - "sma": Simple Moving Average
- * - "ema_short": Short-term Exponential Moving Average
- * - "ema_long": Long-term Exponential Moving Average
- * - "macd": MACD indicator
- * - "signal": Signal line
- * - "distance": Distance metric
- */
-
 import {
     CartesianGrid,
     Line,
-    LineChart,
     ReferenceLine,
+    Scatter,
     XAxis,
     YAxis,
+    ComposedChart,
 } from "recharts";
 import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
@@ -74,7 +45,9 @@ type CryptoData = {
 type ChartDataPoint = {
     timestamp: number;
     formattedTime: string;
-    [key: string]: number | string;
+    buySignal?: number;
+    sellSignal?: number;
+    [key: string]: number | string | undefined;
 };
 
 function initializeData(indicators: IndicatorType[]): CryptoData {
@@ -106,6 +79,11 @@ const indicatorLabels: Record<IndicatorType, string> = {
     macd: "MACD",
     signal: "Signal",
     distance: "Distance",
+};
+
+const signalLabels = {
+    buySignal: "Buy",
+    sellSignal: "Sell",
 };
 
 function Graph({
@@ -160,13 +138,12 @@ function Graph({
             (a, b) => a - b,
         );
 
-        return sortedTimestamps.map((timestamp) => {
+        const dataPoints = sortedTimestamps.map((timestamp) => {
             const dataPoint: ChartDataPoint = {
                 timestamp,
                 formattedTime: dateFormatter.format(new Date(timestamp)),
             };
 
-            // Add values for each indicator at this timestamp
             indicators.forEach((indicator) => {
                 const indicatorData = cryptoData[indicator];
                 if (indicatorData && indicatorData.timestamps.length > 0) {
@@ -179,6 +156,70 @@ function Graph({
 
             return dataPoint;
         });
+
+        // Generate buy/sell signals
+        const dataPointsWithSignals = dataPoints.map((dataPoint, index) => {
+            const newDataPoint = { ...dataPoint };
+
+            // EMA crossover signals (ema_short vs ema_long)
+            if (
+                index > 0 &&
+                dataPoint.ema_short !== undefined &&
+                dataPoint.ema_long !== undefined
+            ) {
+                const prevPoint = dataPoints[index - 1];
+                const currentEmaShort = dataPoint.ema_short as number;
+                const currentEmaLong = dataPoint.ema_long as number;
+                const prevEmaShort = prevPoint.ema_short as number;
+                const prevEmaLong = prevPoint.ema_long as number;
+
+                // Check for crossover
+                if (
+                    prevEmaShort <= prevEmaLong &&
+                    currentEmaShort > currentEmaLong
+                ) {
+                    newDataPoint.buySignal =
+                        (dataPoint.close as number) || currentEmaShort;
+                } else if (
+                    prevEmaShort >= prevEmaLong &&
+                    currentEmaShort < currentEmaLong
+                ) {
+                    newDataPoint.sellSignal =
+                        (dataPoint.close as number) || currentEmaShort;
+                }
+            }
+
+            // MACD signals (signal vs macd)
+            if (
+                index > 0 &&
+                dataPoint.signal !== undefined &&
+                dataPoint.macd !== undefined
+            ) {
+                const prevPoint = dataPoints[index - 1];
+                const currentSignal = dataPoint.signal as number;
+                const currentMacd = dataPoint.macd as number;
+                const prevSignal = prevPoint.signal as number;
+                const prevMacd = prevPoint.macd as number;
+
+                // Check for crossover
+                if (prevSignal >= prevMacd && currentSignal < currentMacd) {
+                    // MACD above signal (buy signal)
+                    newDataPoint.buySignal =
+                        (dataPoint.close as number) || currentMacd;
+                } else if (
+                    prevSignal <= prevMacd &&
+                    currentSignal > currentMacd
+                ) {
+                    // Signal above MACD (sell signal)
+                    newDataPoint.sellSignal =
+                        (dataPoint.close as number) || currentMacd;
+                }
+            }
+
+            return newDataPoint;
+        });
+
+        return dataPointsWithSignals;
     }, [cryptoData, indicators]);
 
     // Calculate Y-axis domain based on data range
@@ -214,6 +255,17 @@ function Graph({
                 color: indicatorColors[indicator],
             };
         });
+
+        // Add buy/sell signal configs
+        config.buySignal = {
+            label: "Buy",
+            color: "#22c55e",
+        };
+        config.sellSignal = {
+            label: "Sell",
+            color: "#ef4444",
+        };
+
         return config;
     };
 
@@ -319,10 +371,20 @@ function Graph({
     // Custom formatter that preserves the default tooltip appearance
     const customTooltipFormatter = (value: any, name: any, item: any) => {
         const formattedValue = formatTooltipValue(Number(value));
-        const indicatorColor =
-            item?.payload?.fill ||
-            item?.color ||
-            indicatorColors[name as IndicatorType];
+        let indicatorColor: string;
+        let labelText: string;
+
+        // Handle buy/sell signals
+        if (name === "buySignal" || name === "sellSignal") {
+            indicatorColor = name === "buySignal" ? "#22c55e" : "#ef4444";
+            labelText = signalLabels[name as keyof typeof signalLabels];
+        } else {
+            indicatorColor =
+                item?.payload?.fill ||
+                item?.color ||
+                indicatorColors[name as IndicatorType];
+            labelText = indicatorLabels[name as IndicatorType] || name;
+        }
 
         return (
             <>
@@ -333,9 +395,7 @@ function Graph({
                     }}
                 />
                 <div className="flex flex-1 justify-between leading-none items-center">
-                    <span className="text-muted-foreground">
-                        {indicatorLabels[name as IndicatorType] || name}
-                    </span>
+                    <span className="text-muted-foreground">{labelText}</span>
                     <span className="text-foreground font-mono font-medium tabular-nums">
                         {formattedValue}
                     </span>
@@ -363,7 +423,7 @@ function Graph({
                         config={chartConfig}
                         className="h-[300px] w-full"
                     >
-                        <LineChart
+                        <ComposedChart
                             accessibilityLayer
                             data={chartData}
                             margin={{
@@ -424,6 +484,24 @@ function Graph({
                                     connectNulls={false}
                                 />
                             ))}
+                            {/* Buy signals */}
+                            <Scatter
+                                dataKey="buySignal"
+                                fill="#22c55e"
+                                fillOpacity={0.8}
+                                stroke="#16a34a"
+                                strokeWidth={2}
+                                shape="circle"
+                            />
+                            {/* Sell signals */}
+                            <Scatter
+                                dataKey="sellSignal"
+                                fill="#ef4444"
+                                fillOpacity={0.8}
+                                stroke="#dc2626"
+                                strokeWidth={2}
+                                shape="circle"
+                            />
                             {indicators.includes("distance") && (
                                 <ReferenceLine
                                     y={0}
@@ -433,7 +511,7 @@ function Graph({
                                 />
                             )}
                             <ChartLegend content={<ChartLegendContent />} />
-                        </LineChart>
+                        </ComposedChart>
                     </ChartContainer>
                 )}
             </CardContent>

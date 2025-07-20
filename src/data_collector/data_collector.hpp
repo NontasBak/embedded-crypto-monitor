@@ -27,25 +27,23 @@ typedef struct {
 namespace DataCollector {
 
 extern const long MA_WINDOW;
-extern const long EMA_WINDOW;
 extern const long SIGNAL_WINDOW;
-extern const long AVERAGE_HISTORY_MS;
 extern const long SHORT_TERM_EMA_WINDOW;
 extern const long LONG_TERM_EMA_WINDOW;
+extern const long AVERAGE_HISTORY_MS;
+extern const long HISTORY_MS;
 extern std::map<std::string, std::deque<dataPoint_t>> latestAverages;
 extern std::map<std::string, std::deque<dataPoint_t>> latestExponentialAverages;
-extern std::map<std::string, std::deque<dataPoint_t>>
-    latestShortTermEMA;  // 15 minutes
-extern std::map<std::string, std::deque<dataPoint_t>>
-    latestLongTermEMA;  // 30 minutes
+extern std::map<std::string, std::deque<dataPoint_t>> latestShortTermEMA;
+extern std::map<std::string, std::deque<dataPoint_t>> latestLongTermEMA;
 extern std::map<std::string, std::deque<dataPoint_t>> latestMACD;
 extern std::map<std::string, std::deque<dataPoint_t>> latestSignal;
 extern std::map<std::string, std::deque<dataPoint_t>> latestDistance;
 extern std::map<std::string, std::deque<dataPoint_t>> latestClosingPrices;
 extern pthread_mutex_t averagesMutex;
 
-void storeAverage(std::string symbol, double average, long timestamp, int delay,
-                  std::string type);
+void storeAverage(std::string symbol, double average, long timestamp,
+                  int delay);
 void cleanupOldAverages(long currentTimestamp);
 void cleanupOldData(long currentTimestamp);
 void* calculateAverage(std::vector<std::string> symbols, long currentTimestamp);

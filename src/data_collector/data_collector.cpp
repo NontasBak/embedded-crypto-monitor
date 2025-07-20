@@ -8,13 +8,15 @@
 #include "../measurement/measurement.hpp"
 #include "../scheduler/scheduler.hpp"
 
-const long DataCollector::MA_WINDOW = 15 * 60 * 1000;   // 15 minutes
-const long DataCollector::EMA_WINDOW = 28 * 60 * 1000;  // 26 minutes
+const long DataCollector::MA_WINDOW = 15 * 60 * 60 * 1000;  // 15 hours
+const long DataCollector::SHORT_TERM_EMA_WINDOW =
+    12 * 60 * 60 * 1000;  // 12 hours
+const long DataCollector::LONG_TERM_EMA_WINDOW =
+    26 * 60 * 60 * 1000;                                       // 26 hours
+const long DataCollector::SIGNAL_WINDOW = 9 * 60 * 60 * 1000;  // 9 hours
 const long DataCollector::AVERAGE_HISTORY_MS =
-    60 * 60 * 1000;  // 60 minutes, for pearson
-const long DataCollector::SHORT_TERM_EMA_WINDOW = 12 * 60 * 1000;  // 12 minutes
-const long DataCollector::LONG_TERM_EMA_WINDOW = 26 * 60 * 1000;   // 26 minutes
-const long DataCollector::SIGNAL_WINDOW = 9 * 60 * 1000;           // 9 minutes
+    3 * 24 * 60 * 60 * 1000;                                     // 3 days
+const long DataCollector::HISTORY_MS = 3 * 24 * 60 * 60 * 1000;  // 3 days
 std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestAverages;
 std::map<std::string, std::deque<dataPoint_t>>
     DataCollector::latestExponentialAverages;
@@ -55,11 +57,6 @@ void* DataCollector::workerThread(void* arg) {
         calculateSignal(symbols, timestamp, SIGNAL_WINDOW);
         calculateDistance(symbols, timestamp);
         calculateClosingPrice(symbols, timestamp);
-
-        // for (const std::string& symbol : symbols) {
-        //     cleanupOldAverages(symbol, timestamp);
-        //     cleanupOldMACDData(symbol, timestamp);
-        // }
     }
 
     return nullptr;
@@ -89,8 +86,7 @@ void* DataCollector::calculateAverage(std::vector<std::string> symbols,
                              .count();
         int delay = timestamp - currentTimestamp;
 
-        DataCollector::storeAverage(symbol, average, currentTimestamp, delay,
-                                    "simple");
+        DataCollector::storeAverage(symbol, average, currentTimestamp, delay);
 
         std::cout << "Moving average for " << symbol << ": " << average
                   << std::endl;
@@ -142,24 +138,10 @@ void* DataCollector::calculateAllExponentialAverages(
         latestShortTermEMA[symbol].push_back(shortTermAverage);
         pthread_mutex_unlock(&averagesMutex);
 
-        // auto now = std::chrono::system_clock::now();
-        // auto timestamp =
-        // std::chrono::duration_cast<std::chrono::milliseconds>(
-        //                      now.time_since_epoch())
-        //                      .count();
-        // int delay = timestamp - currentTimestamp;
-
-        // DataCollector::storeAverage(symbol, exponentialAverageShortTerm,
-        //                             currentTimestamp, delay,
-        //                             "exponential");
-        // DataCollector::storeAverage(symbol, exponentialAverageLongTerm,
-        //                             currentTimestamp, delay,
-        //                             "exponential");
-
-        std::cout << "Exponential moving average (short term) for " << symbol
-                  << ": " << exponentialAverageShortTerm << std::endl;
-        std::cout << "Exponential moving average (long term) for " << symbol
-                  << ": " << exponentialAverageLongTerm << std::endl;
+        // std::cout << "Exponential moving average (short term) for " << symbol
+        //           << ": " << exponentialAverageShortTerm << std::endl;
+        // std::cout << "Exponential moving average (long term) for " << symbol
+        //           << ": " << exponentialAverageLongTerm << std::endl;
     }
 
     return nullptr;
@@ -175,16 +157,7 @@ double DataCollector::calculateExponentialAverage(
         return 0;
     }
 
-    double weightedAveragePrice = 0;
-    double totalVolume = 0;
-
-    for (const measurement_t& meas : measurements) {
-        weightedAveragePrice += meas.px * meas.sz;
-        totalVolume += meas.sz;
-    }
-
-    double currentPrice =
-        (totalVolume > 0) ? weightedAveragePrice / totalVolume : 0;
+    double currentPrice = measurements.back().px;
 
     double exponentialAverage;
     if (previousEMA == 0) {
@@ -224,8 +197,8 @@ void* DataCollector::calculateMACD(std::vector<std::string> symbols,
             latestMACD[symbol].push_back(macd);
             pthread_mutex_unlock(&averagesMutex);
 
-            std::cout << "MACD for " << symbol << ": " << macdValue
-                      << std::endl;
+            // std::cout << "MACD for " << symbol << ": " << macdValue
+            //           << std::endl;
         }
     }
 
@@ -268,8 +241,8 @@ void* DataCollector::calculateSignal(std::vector<std::string> symbols,
             latestSignal[symbol].push_back(signal);
             pthread_mutex_unlock(&averagesMutex);
 
-            std::cout << "Signal for " << symbol << ": " << signalValue
-                      << std::endl;
+            // std::cout << "Signal for " << symbol << ": " << signalValue
+            //           << std::endl;
         }
     }
 
@@ -304,8 +277,8 @@ void* DataCollector::calculateDistance(std::vector<std::string> symbols,
             latestDistance[symbol].push_back(distance);
             pthread_mutex_unlock(&averagesMutex);
 
-            std::cout << "Distance for " << symbol << ": " << distanceValue
-                      << std::endl;
+            // std::cout << "Distance for " << symbol << ": " << distanceValue
+            //           << std::endl;
         }
     }
 
@@ -331,8 +304,9 @@ void* DataCollector::calculateClosingPrice(std::vector<std::string> symbols,
             latestClosingPrices[symbol].push_back(closingPricePoint);
             pthread_mutex_unlock(&averagesMutex);
 
-            std::cout << "Closing price for " << symbol << ": " << closingPrice
-                      << std::endl;
+            // std::cout << "Closing price for " << symbol << ": " <<
+            // closingPrice
+            //           << std::endl;
         }
     }
 
@@ -340,17 +314,11 @@ void* DataCollector::calculateClosingPrice(std::vector<std::string> symbols,
 }
 
 void DataCollector::storeAverage(std::string symbol, double average,
-                                 long timestamp, int delay, std::string type) {
+                                 long timestamp, int delay) {
     dataPoint_t avg = {.data = average, .timestamp = timestamp};
 
     pthread_mutex_lock(&averagesMutex);
-
-    if (type == "exponential") {
-        latestExponentialAverages[symbol].push_back(avg);
-    } else if (type == "simple") {
-        latestAverages[symbol].push_back(avg);
-    }
-
+    latestAverages[symbol].push_back(avg);
     pthread_mutex_unlock(&averagesMutex);
 
     std::string filename = "data/average.txt";
@@ -497,54 +465,52 @@ void DataCollector::cleanupOldAverages(long currentTimestamp) {
     }
 }
 
-// void DataCollector::cleanupOldData(long currentTimestamp) {
-//     // Short-term EMA data
-//     for (auto& pair : latestShortTermEMA) {
-//         std::deque<dataPoint_t>& shortTermEMA = pair.second;
-//         while (!shortTermEMA.empty() &&
-//                (currentTimestamp - shortTermEMA.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             shortTermEMA.pop_front();
-//         }
-//     }
+void DataCollector::cleanupOldData(long currentTimestamp) {
+    // Short-term EMA data
+    for (auto& pair : latestShortTermEMA) {
+        std::deque<dataPoint_t>& shortTermEMA = pair.second;
+        while (
+            !shortTermEMA.empty() &&
+            (currentTimestamp - shortTermEMA.front().timestamp > HISTORY_MS)) {
+            shortTermEMA.pop_front();
+        }
+    }
 
-//     // long-term EMA data
-//     for (auto& pair : latestLongTermEMA) {
-//         std::deque<dataPoint_t>& longTermEMA = pair.second;
-//         while (!longTermEMA.empty() &&
-//                (currentTimestamp - longTermEMA.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             longTermEMA.pop_front();
-//         }
-//     }
+    // long-term EMA data
+    for (auto& pair : latestLongTermEMA) {
+        std::deque<dataPoint_t>& longTermEMA = pair.second;
+        while (
+            !longTermEMA.empty() &&
+            (currentTimestamp - longTermEMA.front().timestamp > HISTORY_MS)) {
+            longTermEMA.pop_front();
+        }
+    }
 
-//     // MACD data
-//     for (auto& pair : latestMACD) {
-//         std::deque<dataPoint_t>& macdData = pair.second;
-//         while (!macdData.empty() &&
-//                (currentTimestamp - macdData.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             macdData.pop_front();
-//         }
-//     }
+    // MACD data
+    for (auto& pair : latestMACD) {
+        std::deque<dataPoint_t>& macdData = pair.second;
+        while (!macdData.empty() &&
+               (currentTimestamp - macdData.front().timestamp > HISTORY_MS)) {
+            macdData.pop_front();
+        }
+    }
 
-//     // signal data
-//     for (auto& pair : latestSignal) {
-//         std::deque<dataPoint_t>& signalData = pair.second;
-//         while (!signalData.empty() &&
-//                (currentTimestamp - signalData.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             signalData.pop_front();
-//         }
-//     }
+    // signal data
+    for (auto& pair : latestSignal) {
+        std::deque<dataPoint_t>& signalData = pair.second;
+        while (!signalData.empty() &&
+               (currentTimestamp - signalData.front().timestamp > HISTORY_MS)) {
+            signalData.pop_front();
+        }
+    }
 
-//     // distance data
-//     for (auto& pair : latestDistance) {
-//         std::deque<dataPoint_t>& distanceData = pair.second;
-//         while (!distanceData.empty() &&
-//                (currentTimestamp - distanceData.front().timestamp >
-//                 AVERAGE_HISTORY_MS)) {
-//             distanceData.pop_front();
-//         }
-//     }
-// }
+    // distance data
+    for (auto& pair : latestDistance) {
+        std::deque<dataPoint_t>& distanceData = pair.second;
+        while (
+            !distanceData.empty() &&
+            (currentTimestamp - distanceData.front().timestamp > HISTORY_MS)) {
+            distanceData.pop_front();
+        }
+    }
+}

@@ -105,7 +105,8 @@ void HTTPServer::handleSMA(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(averages);
+        value_t filteredAverages = filterDataPoints(averages);
+        std::string json = valueToJson(filteredAverages);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -140,7 +141,8 @@ void HTTPServer::handleEMA(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(emas);
+        value_t filteredEmas = filterDataPoints(emas);
+        std::string json = valueToJson(filteredEmas);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -173,7 +175,8 @@ void HTTPServer::handleMACD(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(macd);
+        value_t filteredMacd = filterDataPoints(macd);
+        std::string json = valueToJson(filteredMacd);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -207,7 +210,8 @@ void HTTPServer::handleSignal(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(signals);
+        value_t filteredSignals = filterDataPoints(signals);
+        std::string json = valueToJson(filteredSignals);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -241,7 +245,8 @@ void HTTPServer::handleDistance(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(distances);
+        value_t filteredDistances = filterDataPoints(distances);
+        std::string json = valueToJson(filteredDistances);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -275,7 +280,8 @@ void HTTPServer::handleClosingPrice(const httplib::Request& req,
             return;
         }
 
-        std::string json = valueToJson(closingPrices);
+        value_t filteredClosingPrices = filterDataPoints(closingPrices);
+        std::string json = valueToJson(filteredClosingPrices);
         res.set_content(json, "application/json");
     } catch (const std::exception& e) {
         res.status = 400;
@@ -332,4 +338,36 @@ bool HTTPServer::validateParameters(
         }
     }
     return true;
+}
+
+value_t HTTPServer::filterDataPoints(const value_t& data, size_t maxPoints) {
+    if (data.values.size() <= maxPoints) {
+        return data;
+    }
+
+    value_t filtered;
+    size_t step = data.values.size() / maxPoints;
+    size_t remainder = data.values.size() % maxPoints;
+
+    // Calculate indices to sample evenly across the dataset
+    for (size_t i = 0; i < maxPoints; ++i) {
+        size_t index = i * step;
+
+        // Distribute the remainder points evenly
+        if (i < remainder) {
+            index += i;
+        } else {
+            index += remainder;
+        }
+
+        // Ensure we don't go out of bounds
+        if (index >= data.values.size()) {
+            index = data.values.size() - 1;
+        }
+
+        filtered.values.push_back(data.values[index]);
+        filtered.timestamps.push_back(data.timestamps[index]);
+    }
+
+    return filtered;
 }
