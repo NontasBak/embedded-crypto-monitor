@@ -8,7 +8,7 @@ SOURCES = src/main.cpp \
           src/pearson/pearson.cpp \
           src/server/server.cpp
 
-LIBS = -lwebsockets -lpthread
+LIBS = -lwebsockets -lpthread -lcpp-httplib
 
 TARGET = crypto_monitor
 CXX = g++
