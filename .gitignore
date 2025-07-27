@@ -48,3 +48,7 @@ crypto_monitor_rpi
 producer_consumer.c
 
 .vscode/*
+
+report.synctex.gz
+report.log
+report.aux
