@@ -28,7 +28,7 @@ std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestSignal;
 std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestDistance;
 std::map<std::string, std::deque<dataPoint_t>>
     DataCollector::latestClosingPrices;
-pthread_mutex_t DataCollector::averagesMutex;
+pthread_mutex_t DataCollector::dataCollectorMutex;
 
 void* DataCollector::workerThread(void* arg) {
     scheduler_t* scheduler = (scheduler_t*)arg;
@@ -60,6 +60,10 @@ void* DataCollector::workerThread(void* arg) {
     }
 
     return nullptr;
+}
+
+double getLatestValidValue(const std::deque<dataPoint_t>& deque) {
+    return deque.empty() ? 0.0 : deque.back().data;
 }
 
 void* DataCollector::calculateAverage(std::vector<std::string> symbols,
@@ -105,7 +109,7 @@ void* DataCollector::calculateAllExponentialAverages(
             Measurement::getRecentMeasurements(symbol, LONG_TERM_EMA_WINDOW,
                                                currentTimestamp);
 
-        pthread_mutex_lock(&averagesMutex);
+        pthread_mutex_lock(&dataCollectorMutex);
         double previousEMAShortTerm = 0;
         double previousEMALongTerm = 0;
         if (!latestShortTermEMA[symbol].empty()) {
@@ -114,7 +118,7 @@ void* DataCollector::calculateAllExponentialAverages(
         if (!latestLongTermEMA[symbol].empty()) {
             previousEMALongTerm = latestLongTermEMA[symbol].back().data;
         }
-        pthread_mutex_unlock(&averagesMutex);
+        pthread_mutex_unlock(&dataCollectorMutex);
 
         double exponentialAverageShortTerm = calculateExponentialAverage(
             measurementsForSymbolShortTerm, previousEMAShortTerm,
@@ -133,10 +137,10 @@ void* DataCollector::calculateAllExponentialAverages(
             .timestamp = currentTimestamp,
         };
 
-        pthread_mutex_lock(&averagesMutex);
+        pthread_mutex_lock(&dataCollectorMutex);
         latestLongTermEMA[symbol].push_back(longTermAverage);
         latestShortTermEMA[symbol].push_back(shortTermAverage);
-        pthread_mutex_unlock(&averagesMutex);
+        pthread_mutex_unlock(&dataCollectorMutex);
 
         // std::cout << "Exponential moving average (short term) for " << symbol
         //           << ": " << exponentialAverageShortTerm << std::endl;
@@ -154,7 +158,7 @@ double DataCollector::calculateExponentialAverage(
     const double alpha = 2.0 / (n + 1);
 
     if (measurements.empty()) {
-        return 0;
+        return previousEMA;  // Return previous EMA instead of 0 when no data
     }
 
     double currentPrice = measurements.back().px;
@@ -172,34 +176,30 @@ double DataCollector::calculateExponentialAverage(
 void* DataCollector::calculateMACD(std::vector<std::string> symbols,
                                    long currentTimestamp) {
     for (const std::string& symbol : symbols) {
-        pthread_mutex_lock(&averagesMutex);
+        pthread_mutex_lock(&dataCollectorMutex);
 
-        double shortTermEMA = 0;
-        double longTermEMA = 0;
+        double shortTermEMA = getLatestValidValue(latestShortTermEMA[symbol]);
+        double longTermEMA = getLatestValidValue(latestLongTermEMA[symbol]);
+        double previousMACD = getLatestValidValue(latestMACD[symbol]);
 
-        if (!latestShortTermEMA[symbol].empty()) {
-            shortTermEMA = latestShortTermEMA[symbol].back().data;
-        }
+        pthread_mutex_unlock(&dataCollectorMutex);
 
-        if (!latestLongTermEMA[symbol].empty()) {
-            longTermEMA = latestLongTermEMA[symbol].back().data;
-        }
-
-        pthread_mutex_unlock(&averagesMutex);
-
+        double macdValue;
         if (shortTermEMA != 0 && longTermEMA != 0) {
-            double macdValue = shortTermEMA - longTermEMA;
-
-            dataPoint_t macd = {.data = macdValue,
-                                .timestamp = currentTimestamp};
-
-            pthread_mutex_lock(&averagesMutex);
-            latestMACD[symbol].push_back(macd);
-            pthread_mutex_unlock(&averagesMutex);
-
-            // std::cout << "MACD for " << symbol << ": " << macdValue
-            //           << std::endl;
+            macdValue = shortTermEMA - longTermEMA;
+        } else {
+            // Use previous MACD value if available, otherwise 0
+            macdValue = previousMACD;
         }
+
+        dataPoint_t macd = {.data = macdValue, .timestamp = currentTimestamp};
+
+        pthread_mutex_lock(&dataCollectorMutex);
+        latestMACD[symbol].push_back(macd);
+        pthread_mutex_unlock(&dataCollectorMutex);
+
+        // std::cout << "MACD for " << symbol << ": " << macdValue
+        //           << std::endl;
     }
 
     return nullptr;
@@ -211,39 +211,35 @@ void* DataCollector::calculateSignal(std::vector<std::string> symbols,
     const double alpha = 2.0 / (n + 1);
 
     for (const std::string& symbol : symbols) {
-        pthread_mutex_lock(&averagesMutex);
+        pthread_mutex_lock(&dataCollectorMutex);
 
-        double currentMACD = 0;
-        if (!latestMACD[symbol].empty()) {
-            currentMACD = latestMACD[symbol].back().data;
-        }
+        double currentMACD = getLatestValidValue(latestMACD[symbol]);
+        double previousSignal = getLatestValidValue(latestSignal[symbol]);
 
-        double previousSignal = 0;
-        if (!latestSignal[symbol].empty()) {
-            previousSignal = latestSignal[symbol].back().data;
-        }
+        pthread_mutex_unlock(&dataCollectorMutex);
 
-        pthread_mutex_unlock(&averagesMutex);
-
+        double signalValue;
         if (currentMACD != 0) {
-            double signalValue;
             if (previousSignal == 0) {
                 signalValue = currentMACD;
             } else {
                 signalValue =
                     (currentMACD - previousSignal) * alpha + previousSignal;
             }
-
-            dataPoint_t signal = {.data = signalValue,
-                                  .timestamp = currentTimestamp};
-
-            pthread_mutex_lock(&averagesMutex);
-            latestSignal[symbol].push_back(signal);
-            pthread_mutex_unlock(&averagesMutex);
-
-            // std::cout << "Signal for " << symbol << ": " << signalValue
-            //           << std::endl;
+        } else {
+            // Use previous signal value if available, otherwise 0
+            signalValue = previousSignal;
         }
+
+        dataPoint_t signal = {.data = signalValue,
+                              .timestamp = currentTimestamp};
+
+        pthread_mutex_lock(&dataCollectorMutex);
+        latestSignal[symbol].push_back(signal);
+        pthread_mutex_unlock(&dataCollectorMutex);
+
+        // std::cout << "Signal for " << symbol << ": " << signalValue
+        //           << std::endl;
     }
 
     return nullptr;
@@ -252,34 +248,31 @@ void* DataCollector::calculateSignal(std::vector<std::string> symbols,
 void* DataCollector::calculateDistance(std::vector<std::string> symbols,
                                        long currentTimestamp) {
     for (const std::string& symbol : symbols) {
-        pthread_mutex_lock(&averagesMutex);
+        pthread_mutex_lock(&dataCollectorMutex);
 
-        double currentMACD = 0;
-        double currentSignal = 0;
+        double currentMACD = getLatestValidValue(latestMACD[symbol]);
+        double currentSignal = getLatestValidValue(latestSignal[symbol]);
+        double previousDistance = getLatestValidValue(latestDistance[symbol]);
 
-        if (!latestMACD[symbol].empty()) {
-            currentMACD = latestMACD[symbol].back().data;
-        }
+        pthread_mutex_unlock(&dataCollectorMutex);
 
-        if (!latestSignal[symbol].empty()) {
-            currentSignal = latestSignal[symbol].back().data;
-        }
-
-        pthread_mutex_unlock(&averagesMutex);
-
+        double distanceValue;
         if (currentMACD != 0 && currentSignal != 0) {
-            double distanceValue = currentMACD - currentSignal;
-
-            dataPoint_t distance = {.data = distanceValue,
-                                    .timestamp = currentTimestamp};
-
-            pthread_mutex_lock(&averagesMutex);
-            latestDistance[symbol].push_back(distance);
-            pthread_mutex_unlock(&averagesMutex);
-
-            // std::cout << "Distance for " << symbol << ": " << distanceValue
-            //           << std::endl;
+            distanceValue = currentMACD - currentSignal;
+        } else {
+            // Use previous distance value if available, otherwise 0
+            distanceValue = previousDistance;
         }
+
+        dataPoint_t distance = {.data = distanceValue,
+                                .timestamp = currentTimestamp};
+
+        pthread_mutex_lock(&dataCollectorMutex);
+        latestDistance[symbol].push_back(distance);
+        pthread_mutex_unlock(&dataCollectorMutex);
+
+        // std::cout << "Distance for " << symbol << ": " << distanceValue
+        //           << std::endl;
     }
 
     return nullptr;
@@ -292,22 +285,27 @@ void* DataCollector::calculateClosingPrice(std::vector<std::string> symbols,
             Measurement::getRecentMeasurements(symbol, 60 * 1000,
                                                currentTimestamp);
 
+        double closingPrice;
         if (!measurementsForSymbol.empty()) {
             // Get the most recent measurement as the closing price
             measurement_t latestMeasurement = measurementsForSymbol.back();
-            double closingPrice = latestMeasurement.px;
-
-            dataPoint_t closingPricePoint = {.data = closingPrice,
-                                             .timestamp = currentTimestamp};
-
-            pthread_mutex_lock(&averagesMutex);
-            latestClosingPrices[symbol].push_back(closingPricePoint);
-            pthread_mutex_unlock(&averagesMutex);
-
-            // std::cout << "Closing price for " << symbol << ": " <<
-            // closingPrice
-            //           << std::endl;
+            closingPrice = latestMeasurement.px;
+        } else {
+            // Use previous closing price if available, otherwise 0
+            pthread_mutex_lock(&dataCollectorMutex);
+            closingPrice = getLatestValidValue(latestClosingPrices[symbol]);
+            pthread_mutex_unlock(&dataCollectorMutex);
         }
+
+        dataPoint_t closingPricePoint = {.data = closingPrice,
+                                         .timestamp = currentTimestamp};
+
+        pthread_mutex_lock(&dataCollectorMutex);
+        latestClosingPrices[symbol].push_back(closingPricePoint);
+        pthread_mutex_unlock(&dataCollectorMutex);
+
+        // std::cout << "Closing price for " << symbol << ": " << closingPrice
+        //           << std::endl;
     }
 
     return nullptr;
@@ -317,9 +315,9 @@ void DataCollector::storeAverage(std::string symbol, double average,
                                  long timestamp, int delay) {
     dataPoint_t avg = {.data = average, .timestamp = timestamp};
 
-    pthread_mutex_lock(&averagesMutex);
+    pthread_mutex_lock(&dataCollectorMutex);
     latestAverages[symbol].push_back(avg);
-    pthread_mutex_unlock(&averagesMutex);
+    pthread_mutex_unlock(&dataCollectorMutex);
 
     std::string filename = "data/average.txt";
 
@@ -335,7 +333,7 @@ void DataCollector::storeAverage(std::string symbol, double average,
 
 value_t DataCollector::getRecentEMA(const std::string& symbol, long timestamp,
                                     size_t window, std::string type) {
-    pthread_mutex_lock(&averagesMutex);
+    pthread_mutex_lock(&dataCollectorMutex);
 
     value_t result;
     const std::deque<dataPoint_t>* averages;
@@ -345,7 +343,7 @@ value_t DataCollector::getRecentEMA(const std::string& symbol, long timestamp,
         averages = &latestLongTermEMA[symbol];
     } else {
         std::cerr << "Invalid type: " << type << std::endl;
-        pthread_mutex_unlock(&averagesMutex);
+        pthread_mutex_unlock(&dataCollectorMutex);
         return result;
     }
 
@@ -355,14 +353,14 @@ value_t DataCollector::getRecentEMA(const std::string& symbol, long timestamp,
         result.values.push_back(averages->at(i).data);
         result.timestamps.push_back(averages->at(i).timestamp);
     }
-    pthread_mutex_unlock(&averagesMutex);
+    pthread_mutex_unlock(&dataCollectorMutex);
 
     return result;
 }
 
 value_t DataCollector::getRecentAverages(const std::string& symbol,
                                          long timestamp, size_t window) {
-    pthread_mutex_lock(&averagesMutex);
+    pthread_mutex_lock(&dataCollectorMutex);
 
     value_t result;
     const std::deque<dataPoint_t>& averages = latestAverages[symbol];
@@ -373,14 +371,14 @@ value_t DataCollector::getRecentAverages(const std::string& symbol,
         result.values.push_back(averages.at(i).data);
         result.timestamps.push_back(averages.at(i).timestamp);
     }
-    pthread_mutex_unlock(&averagesMutex);
+    pthread_mutex_unlock(&dataCollectorMutex);
 
     return result;
 }
 
 value_t DataCollector::getRecentMACD(const std::string& symbol, long timestamp,
                                      size_t window) {
-    pthread_mutex_lock(&averagesMutex);
+    pthread_mutex_lock(&dataCollectorMutex);
     value_t result;
     const std::deque<dataPoint_t>& macdData = latestMACD[symbol];
 
@@ -391,14 +389,14 @@ value_t DataCollector::getRecentMACD(const std::string& symbol, long timestamp,
         result.values.push_back(macdData.at(i).data);
         result.timestamps.push_back(macdData.at(i).timestamp);
     }
-    pthread_mutex_unlock(&averagesMutex);
+    pthread_mutex_unlock(&dataCollectorMutex);
 
     return result;
 }
 
 value_t DataCollector::getRecentSignal(const std::string& symbol,
                                        long timestamp, size_t window) {
-    pthread_mutex_lock(&averagesMutex);
+    pthread_mutex_lock(&dataCollectorMutex);
 
     value_t result;
     const std::deque<dataPoint_t>& signalData = latestSignal[symbol];
@@ -410,14 +408,14 @@ value_t DataCollector::getRecentSignal(const std::string& symbol,
         result.values.push_back(signalData.at(i).data);
         result.timestamps.push_back(signalData.at(i).timestamp);
     }
-    pthread_mutex_unlock(&averagesMutex);
+    pthread_mutex_unlock(&dataCollectorMutex);
 
     return result;
 }
 
 value_t DataCollector::getRecentDistance(const std::string& symbol,
                                          long timestamp, size_t window) {
-    pthread_mutex_lock(&averagesMutex);
+    pthread_mutex_lock(&dataCollectorMutex);
 
     value_t result;
     const std::deque<dataPoint_t>& distanceData = latestDistance[symbol];
@@ -429,14 +427,14 @@ value_t DataCollector::getRecentDistance(const std::string& symbol,
         result.values.push_back(distanceData.at(i).data);
         result.timestamps.push_back(distanceData.at(i).timestamp);
     }
-    pthread_mutex_unlock(&averagesMutex);
+    pthread_mutex_unlock(&dataCollectorMutex);
 
     return result;
 }
 
 value_t DataCollector::getRecentClosingPrices(const std::string& symbol,
                                               long timestamp, size_t window) {
-    pthread_mutex_lock(&averagesMutex);
+    pthread_mutex_lock(&dataCollectorMutex);
 
     value_t result;
     const std::deque<dataPoint_t>& closingPriceData =
@@ -449,7 +447,7 @@ value_t DataCollector::getRecentClosingPrices(const std::string& symbol,
         result.values.push_back(closingPriceData.at(i).data);
         result.timestamps.push_back(closingPriceData.at(i).timestamp);
     }
-    pthread_mutex_unlock(&averagesMutex);
+    pthread_mutex_unlock(&dataCollectorMutex);
 
     return result;
 }
@@ -466,7 +464,7 @@ void DataCollector::cleanupOldAverages(long currentTimestamp) {
 }
 
 void DataCollector::cleanupOldData(long currentTimestamp) {
-    // Short-term EMA data
+    // short-term EMA data
     for (auto& pair : latestShortTermEMA) {
         std::deque<dataPoint_t>& shortTermEMA = pair.second;
         while (
@@ -511,6 +509,16 @@ void DataCollector::cleanupOldData(long currentTimestamp) {
             !distanceData.empty() &&
             (currentTimestamp - distanceData.front().timestamp > HISTORY_MS)) {
             distanceData.pop_front();
+        }
+    }
+
+    // closing price data
+    for (auto& pair : latestClosingPrices) {
+        std::deque<dataPoint_t>& closingPriceData = pair.second;
+        while (!closingPriceData.empty() &&
+               (currentTimestamp - closingPriceData.front().timestamp >
+                HISTORY_MS)) {
+            closingPriceData.pop_front();
         }
     }
 }

@@ -40,7 +40,7 @@ extern std::map<std::string, std::deque<dataPoint_t>> latestMACD;
 extern std::map<std::string, std::deque<dataPoint_t>> latestSignal;
 extern std::map<std::string, std::deque<dataPoint_t>> latestDistance;
 extern std::map<std::string, std::deque<dataPoint_t>> latestClosingPrices;
-extern pthread_mutex_t averagesMutex;
+extern pthread_mutex_t dataCollectorMutex;
 
 void storeAverage(std::string symbol, double average, long timestamp,
                   int delay);
