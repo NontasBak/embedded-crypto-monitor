@@ -69,20 +69,17 @@ double getLatestValidValue(const std::deque<dataPoint_t>& deque) {
 void* DataCollector::calculateAverage(std::vector<std::string> symbols,
                                       long currentTimestamp) {
     for (const std::string& symbol : symbols) {
-        std::vector<measurement_t> measurementsForSymbol =
-            Measurement::getRecentMeasurements(symbol, MA_WINDOW,
-                                               currentTimestamp);
+        value_t recentClosingPrices = DataCollector::getRecentClosingPrices(
+            symbol, currentTimestamp, MA_WINDOW / (60 * 1000));
 
-        double weightedAveragePrice = 0;
-        double totalVolume = 0;
+        double sum = 0;
+        int count = recentClosingPrices.values.size();
 
-        for (const measurement_t& meas : measurementsForSymbol) {
-            weightedAveragePrice += meas.px * meas.sz;
-            totalVolume += meas.sz;
+        for (double price : recentClosingPrices.values) {
+            sum += price;
         }
 
-        double average =
-            (totalVolume > 0) ? weightedAveragePrice / totalVolume : 0;
+        double average = (count > 0) ? sum / count : 0;
 
         auto now = std::chrono::system_clock::now();
         auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
