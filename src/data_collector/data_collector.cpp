@@ -51,12 +51,12 @@ void* DataCollector::workerThread(void* arg) {
         long timestamp = scheduler->currentTimestamp;
         pthread_mutex_unlock(&scheduler->averageMutex);
 
+        calculateClosingPrice(symbols, timestamp);
         calculateAverage(symbols, timestamp);
         calculateAllExponentialAverages(symbols, timestamp);
         calculateMACD(symbols, timestamp);
         calculateSignal(symbols, timestamp, SIGNAL_WINDOW);
         calculateDistance(symbols, timestamp);
-        calculateClosingPrice(symbols, timestamp);
     }
 
     return nullptr;
@@ -79,7 +79,12 @@ void* DataCollector::calculateAverage(std::vector<std::string> symbols,
             sum += price;
         }
 
-        double average = (count > 0) ? sum / count : 0;
+        double average = 0;
+        if (count > 0) {
+            average = sum / count;
+        } else {
+            average = getLatestValidValue(latestAverages[symbol]);
+        }
 
         auto now = std::chrono::system_clock::now();
         auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(

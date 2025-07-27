@@ -129,6 +129,8 @@ function Graph({
     // Transform data for recharts, combine all indicators
     const chartData = useMemo((): ChartDataPoint[] => {
         const dateFormatter = new Intl.DateTimeFormat(undefined, {
+            day: "2-digit",
+            month: "2-digit",
             hour: "2-digit",
             minute: "2-digit",
         });
