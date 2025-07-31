@@ -45,7 +45,7 @@ To cross compile for the RPI, run
 make rpi
 ```
 
-To run it continously
+To run it continuously
 ```bash
 nohup ./crypto_monitor_rpi &
 ```
