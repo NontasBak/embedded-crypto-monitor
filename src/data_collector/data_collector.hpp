@@ -40,9 +40,10 @@ extern std::map<std::string, std::deque<dataPoint_t>> latestMACD;
 extern std::map<std::string, std::deque<dataPoint_t>> latestSignal;
 extern std::map<std::string, std::deque<dataPoint_t>> latestDistance;
 extern std::map<std::string, std::deque<dataPoint_t>> latestClosingPrices;
+extern std::map<std::string, std::deque<dataPoint_t>> latestClosingVolumes;
 extern pthread_mutex_t dataCollectorMutex;
 
-void storeAverage(std::string symbol, double average, long timestamp,
+void storeAverage(std::string symbol, double average, double volume, long timestamp,
                   int delay);
 void cleanupOldAverages(long currentTimestamp);
 void cleanupOldData(long currentTimestamp);
@@ -58,6 +59,8 @@ void* calculateDistance(std::vector<std::string> symbols,
                         long currentTimestamp);
 void* calculateClosingPrice(std::vector<std::string> symbols,
                             long currentTimestamp);
+void* calculateClosingVolume(std::vector<std::string> symbols,
+                              long currentTimestamp);
 void* workerThread(void* arg);
 value_t getRecentAverages(const std::string& symbol, long timestamp,
                           size_t window = 0);
@@ -71,5 +74,7 @@ value_t getRecentDistance(const std::string& symbol, long timestamp,
                           size_t window = 0);
 value_t getRecentClosingPrices(const std::string& symbol, long timestamp,
                                size_t window = 0);
+value_t getRecentClosingVolumes(const std::string& symbol, long timestamp,
+                                 size_t window = 0);
 
 }  // namespace DataCollector

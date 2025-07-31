@@ -1,16 +1,3 @@
-# Compiler to use
-CXX = g++
-
-# Compiler flags
-CXXFLAGS = -std=c++14 -Wall -I./src
-
-# For debugging, use this
-# CXXFLAGS = -std=c++14 -Wall -I./src -g -O0
-
-# Libraries to link
-LIBS = -lwebsockets -lpthread -lcpp-httplib
-
-# Source files
 SOURCES = src/main.cpp \
           src/websocket/okx_client.cpp \
           src/scheduler/scheduler.cpp \
@@ -21,27 +8,34 @@ SOURCES = src/main.cpp \
           src/pearson/pearson.cpp \
           src/server/server.cpp
 
-# Name of executable
-TARGET = crypto_monitor
+LIBS = -lwebsockets -lpthread -lcpp-httplib
 
-# The main build rule
+TARGET = crypto_monitor
+CXX = g++
+CXXFLAGS = -std=c++14 -Wall -I./src
+
+TARGET_RPI = crypto_monitor_rpi
+CROSS_PREFIX = aarch64-linux-gnu-
+SYSROOT = /home/nontas/sysroot-rpi
+
+CXX_RPI = $(CROSS_PREFIX)g++
+CXXFLAGS_RPI = -std=c++14 -Wall --sysroot=$(SYSROOT) -I./src -I$(SYSROOT)/usr/include
+LDFLAGS_RPI = --sysroot=$(SYSROOT)
+
 all: $(TARGET)
 
-# Debug target
-# debug: CXXFLAGS += -DDEBUG
-# debug: $(TARGET)
-
-# How to build the executable
 $(TARGET): $(SOURCES)
 	$(CXX) $(CXXFLAGS) $(SOURCES) -o $(TARGET) $(LIBS)
 
-# Clean up
-clean:
-	rm -f $(TARGET)
+$(TARGET_RPI): $(SOURCES)
+	$(CXX_RPI) $(CXXFLAGS_RPI) $(SOURCES) -o $(TARGET_RPI) $(LDFLAGS_RPI) $(LIBS)
 
-# Run the program
+rpi: $(TARGET_RPI)
+
+clean:
+	rm -f $(TARGET) $(TARGET_RPI)
+
 run: all
 	./$(TARGET)
 
-# Phony targets
-.PHONY: all clean run
+.PHONY: all rpi clean run deploy

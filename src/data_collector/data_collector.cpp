@@ -28,6 +28,8 @@ std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestSignal;
 std::map<std::string, std::deque<dataPoint_t>> DataCollector::latestDistance;
 std::map<std::string, std::deque<dataPoint_t>>
     DataCollector::latestClosingPrices;
+std::map<std::string, std::deque<dataPoint_t>>
+    DataCollector::latestClosingVolumes;
 pthread_mutex_t DataCollector::dataCollectorMutex;
 
 void* DataCollector::workerThread(void* arg) {
@@ -52,6 +54,7 @@ void* DataCollector::workerThread(void* arg) {
         pthread_mutex_unlock(&scheduler->averageMutex);
 
         calculateClosingPrice(symbols, timestamp);
+        calculateClosingVolume(symbols, timestamp);
         calculateAverage(symbols, timestamp);
         calculateAllExponentialAverages(symbols, timestamp);
         calculateMACD(symbols, timestamp);
@@ -72,6 +75,11 @@ void* DataCollector::calculateAverage(std::vector<std::string> symbols,
         value_t recentClosingPrices = DataCollector::getRecentClosingPrices(
             symbol, currentTimestamp, MA_WINDOW / (60 * 1000));
 
+        value_t recentClosingVolumes =
+            DataCollector::getRecentClosingVolumes(symbol, currentTimestamp,
+                                                   MA_WINDOW / (60 * 1000));
+
+        // Price
         double sum = 0;
         int count = recentClosingPrices.values.size();
 
@@ -92,7 +100,22 @@ void* DataCollector::calculateAverage(std::vector<std::string> symbols,
                              .count();
         int delay = timestamp - currentTimestamp;
 
-        DataCollector::storeAverage(symbol, average, currentTimestamp, delay);
+        // Volume
+        double volumeSum = 0;
+        int volumeCount = recentClosingVolumes.values.size();
+        
+        for (double volume : recentClosingVolumes.values) {
+            volumeSum += volume;
+        }
+        
+        double volumeAverage = 0;
+        if (volumeCount > 0) {
+            volumeAverage = volumeSum / volumeCount;
+        } else {
+            volumeAverage = getLatestValidValue(latestClosingVolumes[symbol]);
+        }
+
+        DataCollector::storeAverage(symbol, average, volumeAverage, currentTimestamp, delay);
 
         std::cout << "Moving average for " << symbol << ": " << average
                   << std::endl;
@@ -313,9 +336,42 @@ void* DataCollector::calculateClosingPrice(std::vector<std::string> symbols,
     return nullptr;
 }
 
-void DataCollector::storeAverage(std::string symbol, double average,
+void* DataCollector::calculateClosingVolume(std::vector<std::string> symbols,
+                                           long currentTimestamp) {
+    for (const std::string& symbol : symbols) {
+        std::vector<measurement_t> measurementsForSymbol =
+            Measurement::getRecentMeasurements(symbol, 60 * 1000,
+                                               currentTimestamp);
+
+        double closingVolume;
+        if (!measurementsForSymbol.empty()) {
+            // Get the most recent measurement as the closing volume
+            measurement_t latestMeasurement = measurementsForSymbol.back();
+            closingVolume = latestMeasurement.sz;
+        } else {
+            // Use previous closing volume if available, otherwise 0
+            pthread_mutex_lock(&dataCollectorMutex);
+            closingVolume = getLatestValidValue(latestClosingVolumes[symbol]);
+            pthread_mutex_unlock(&dataCollectorMutex);
+        }
+
+        dataPoint_t closingVolumePoint = {.data = closingVolume,
+                                         .timestamp = currentTimestamp};
+
+        pthread_mutex_lock(&dataCollectorMutex);
+        latestClosingVolumes[symbol].push_back(closingVolumePoint);
+        pthread_mutex_unlock(&dataCollectorMutex);
+
+        // std::cout << "Closing volume for " << symbol << ": " << closingVolume
+        //           << std::endl;
+    }
+
+    return nullptr;
+}
+
+void DataCollector::storeAverage(std::string symbol, double averagePrice, double averageVolume,
                                  long timestamp, int delay) {
-    dataPoint_t avg = {.data = average, .timestamp = timestamp};
+    dataPoint_t avg = {.data = averagePrice, .timestamp = timestamp};
 
     pthread_mutex_lock(&dataCollectorMutex);
     latestAverages[symbol].push_back(avg);
@@ -329,7 +385,7 @@ void DataCollector::storeAverage(std::string symbol, double average,
         return;
     }
 
-    fprintf(fp, "%s %.6f %ld %d\n", symbol.c_str(), average, timestamp, delay);
+    fprintf(fp, "%s %.6f %.6f %ld %d\n", symbol.c_str(), averagePrice, averageVolume, timestamp, delay);
     fclose(fp);
 };
 
@@ -448,6 +504,26 @@ value_t DataCollector::getRecentClosingPrices(const std::string& symbol,
     for (size_t i = startPos; i < closingPriceData.size(); i++) {
         result.values.push_back(closingPriceData.at(i).data);
         result.timestamps.push_back(closingPriceData.at(i).timestamp);
+    }
+    pthread_mutex_unlock(&dataCollectorMutex);
+
+    return result;
+}
+
+value_t DataCollector::getRecentClosingVolumes(const std::string& symbol,
+                                              long timestamp, size_t window) {
+    pthread_mutex_lock(&dataCollectorMutex);
+
+    value_t result;
+    const std::deque<dataPoint_t>& closingVolumeData =
+        latestClosingVolumes[symbol];
+
+    size_t startPos = closingVolumeData.size() > window && window > 0
+                          ? closingVolumeData.size() - window
+                          : 0;
+    for (size_t i = startPos; i < closingVolumeData.size(); i++) {
+        result.values.push_back(closingVolumeData.at(i).data);
+        result.timestamps.push_back(closingVolumeData.at(i).timestamp);
     }
     pthread_mutex_unlock(&dataCollectorMutex);
 
