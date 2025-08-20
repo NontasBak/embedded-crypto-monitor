@@ -110,6 +110,7 @@ where $x_i$ and $y_i$ are the moving averages of the 1st and 2nd symbols respect
 
 \subsection{Delays for moving average calculations}
 The results are produced on a \textbf{Raspberry Pi Zero 2W} with a 1GHz quad-core CPU and 512MB of RAM.
+The timeframe is around 7 days, from August 1st to August 7th.
 Figures \ref{alg:delay-ma-btc} and \ref{alg:delay-ma-bnb} show the distribution of the calculation delays 
 for the moving average using box plots, for the symbols \texttt{BTC-USDT} (first symbol out of the 8) 
 and \texttt{BNB-USDT} (last symbol, highest delays). The delays are measured in milliseconds.
@@ -153,7 +154,7 @@ The delays are generally below 40ms, while on the edge cases we reach above 1000
 
 \subsection{CPU Utilization}
 Lastly, figure \ref{alg:delay-cpu} shows the distribution of the CPU idle percentage throughout the calculations.
-The CPU idle percentage is generally above 96\%, while on the edge cases it can drop to 90\%. Generally,
+The CPU idle percentage is generally above 96\%, while on the edge cases it can drop to 93\%. Generally,
 the CPU is not heavily utilized, which is a good thing in case we have a limited supply of power.
 
 \begin{figure}[H]
@@ -206,6 +207,7 @@ This formula assumes that we're calculating the \texttt{EMA} every hour, but sin
 every minute some modifications are needed (i.e. \texttt{n} will be much larger and alpha will be much smaller).
 The results will be the same. By using large windows (12/26 hours, instead of minutes), we can achieve better results
 with more sporadic buy/sell signals.
+
 
 For comparison, we change the window for the \texttt{SMA} to 15 hours (results displayed on the frontend).
 
@@ -289,11 +291,11 @@ over the 3-day period.
         \hline
         \textbf{Strategy} & \textbf{Final Value} & \textbf{Total Return} & \textbf{Return (\%)} & \textbf{Total Trades} & \textbf{Avg Trades/Symbol} \\
         \hline
-        Distance & \$78,963.10 & \$-1,036.90 & -1.30\% & 62 & 7.8 \\
+        Distance-Based & \$79,476.15 & \$-523.85 & -0.65\% & 44 & 5.5 \\
         \hline
-        EMA & \$79,535.80 & \$-464.20 & -0.58\% & 21 & 2.6 \\
+        EMA Crossover & \$79,769.19 & \$-230.81 & -0.29\% & 8 & 1.0 \\
         \hline
-        Buy \& Hold & \$77,638.99 & \$-2,361.01 & -2.95\% & 0 & 0.0 \\
+        Buy \& Hold & \$75,011.69 & \$-4,988.31 & -6.24\% & 0 & 0.0 \\
         \hline
     \end{tabular}
     \caption{Overall Strategy Performance Comparison}
@@ -301,9 +303,9 @@ over the 3-day period.
 \end{table}
 
 Even though we lost money with all strategies, the results show that the 
-\textbf{EMA Crossover strategy performed the best} with the smallest loss of -0.58\%, 
-followed by the Distance-Based strategy at -1.30\%. The passive Buy \& Hold strategy had the worst 
-performance with a -2.95\% loss over the 3-day period.
+\textbf{EMA Crossover strategy performed the best} with the smallest loss of -0.29\%, 
+followed by the Distance-Based strategy at -0.65\%. The passive Buy \& Hold strategy had the worst 
+performance with a -6.24\% loss over the 3-day period.
 
 The per-symbol best-strategy comparison is shown in table \ref{tab:strategy-performance-symbols}.
 
@@ -313,21 +315,21 @@ The per-symbol best-strategy comparison is shown in table \ref{tab:strategy-perf
         \hline
         \textbf{Symbol} & \textbf{Better Strategy} & \textbf{Difference} & \textbf{Distance Trades} & \textbf{EMA Trades} \\
         \hline
-        BTC-USDT & EMA & \$16.99 & 8 & 5 \\
+        BTC-USDT & EMA & \$45.09 & 5 & 0 \\
         \hline
-        ADA-USDT & EMA & \$121.92 & 8 & 2 \\
+        ADA-USDT & Distance & \$19.70 & 5 & 2 \\
         \hline
-        ETH-USDT & Distance & \$3.48 & 8 & 5 \\
+        ETH-USDT & EMA & \$59.24 & 5 & 0 \\
         \hline
-        DOGE-USDT & EMA & \$102.73 & 8 & 2 \\
+        DOGE-USDT & EMA & \$122.07 & 5 & 0 \\
         \hline
-        XRP-USDT & EMA & \$137.22 & 10 & 1 \\
+        XRP-USDT & Distance & \$58.95 & 3 & 2 \\
         \hline
-        SOL-USDT & EMA & \$141.79 & 8 & 2 \\
+        SOL-USDT & EMA & \$84.38 & 7 & 0 \\
         \hline
-        LTC-USDT & Distance & \$13.22 & 6 & 3 \\
+        LTC-USDT & EMA & \$112.17 & 9 & 0 \\
         \hline
-        BNB-USDT & EMA & \$68.74 & 6 & 1 \\
+        BNB-USDT & Distance & \$51.26 & 5 & 4 \\
         \hline
     \end{tabular}
     \caption{Per-symbol Strategy Performance Comparison}
@@ -351,7 +353,7 @@ the Pearson correlation can be used, but they might show worse results in high v
 \begin{itemize}
     \item The web application can be accessed at \url{https://crypto-monitor.nontasbak.com/}
     \item The API for the data can be accessed at \url{https://api-crypto-monitor.nontasbak.com/} (the REST endpoints are \texttt{/sma}, \texttt{/ema}, \texttt{/close}, \texttt{/macd}, \texttt{/signal}, \texttt{/distance})
-    \item The source code can be found on the \href{https://github.com/NontasBak/embedded-crypto-monitor}{Github repository}.
+    \item The source code along with the data collected can be found on the \href{https://github.com/NontasBak/embedded-crypto-monitor}{Github repository}.
 \end{itemize}
 
 \begin{thebibliography}{9}
