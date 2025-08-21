@@ -38,7 +38,7 @@ instructions-*
 main-old.cpp
 
 # Data files
-data/*
+# data/*
 
 # Final binary file
 crypto_monitor
